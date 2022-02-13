@@ -13,6 +13,15 @@ class Sampling(keras.layers.Layer):
         return mu + tf.exp(0.5 * sigma) * epsilon
 
 def get_encoder(input_size,latent_dim,name="encoder"):
+        
+        if (input_size[0]==1): ## 2D image
+            input_size = input_size[1:]
+            
+        if len(input_size) == 4:
+            conv_layer = keras.layers.Conv3D
+        else:
+            conv_layer = keras.layers.Conv2D
+        
         layer_dim = np.array(input_size[:-1],dtype=np.int32)
         filters = 8
         
@@ -20,7 +29,7 @@ def get_encoder(input_size,latent_dim,name="encoder"):
         
         ## first conv same resulotion
         x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(input)
-        x = keras.layers.Conv3D(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
+        x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
         
         
         ## downsampling layers          
@@ -28,7 +37,7 @@ def get_encoder(input_size,latent_dim,name="encoder"):
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
-            x = keras.layers.Conv3D(filters=filters,kernel_size=3,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
+            x = conv_layer(filters=filters,kernel_size=3,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
             
 
         ## flatten + dense layer
@@ -50,31 +59,40 @@ def get_encoder(input_size,latent_dim,name="encoder"):
         
 def get_decoder(latent_dim,output_size,layer_dim,filters,name="decoder"):
         
+        if (output_size[0]==1): ## 2D image
+            output_size = output_size[1:]
+        
+        if len(output_size) == 4:
+            conv_layer = keras.layers.Conv3DTranspose
+        else:
+            conv_layer = keras.layers.Conv2DTranspose
+        
         input = keras.Input(shape=(latent_dim,))
         
         ## unflatten + dense layer
         x = keras.layers.Reshape(layer_dim)(keras.layers.Dense(tf.math.reduce_prod(layer_dim),name="{}_fc_1".format(name))(input))
         x = keras.layers.BatchNormalization(name="{}_bn_dense_{}".format(name,layer_dim[0]))(x)
 
-        x = keras.layers.Conv3DTranspose(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
+        x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
         x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
         
         ## upsampling layers  
         while layer_dim[0] < output_size[0]:
             layer_dim = layer_dim * 2
             filters = filters // 2
-            x = keras.layers.Conv3DTranspose(filters=filters,kernel_size=3,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
+            x = conv_layer(filters=filters,kernel_size=3,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
             x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
       
 
         ## last conv same resulotion
-        output = keras.layers.Conv3DTranspose(filters=1, kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
+        output = conv_layer(filters=1, kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
 
         return keras.Model(input,output,name=name)  
     
 class VAE(keras.Model):
-    def __init__(self, encoder, decoder, **kwargs):
+    def __init__(self, encoder, decoder, beta=0.5, **kwargs):
         super(VAE, self).__init__(**kwargs)
+        self.beta = beta
         self.encoder = encoder
         self.decoder = decoder
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
@@ -103,7 +121,7 @@ class VAE(keras.Model):
             )
             kl_loss = -0.5 * (1 + sigma - tf.square(mu) - tf.exp(sigma))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            total_loss = reconstruction_loss + kl_loss
+            total_loss = self.beta*reconstruction_loss + (1-self.beta)*kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)

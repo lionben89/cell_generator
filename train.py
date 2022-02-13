@@ -9,7 +9,7 @@ CONTINUE_TRAINING = False
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 model_path = "./vae_single_cell_2d"
-patch_size = (32,64,64,1)
+patch_size = (1,256,256,1) ## 2D: (1,*,*,1) 3D: (*,*,*,1)
 latent_dim = 64
 train_dataset = PatchDataGen("/sise/home/lionb/cell_generator/image_list_train.csv","channel_signal","channel_signal",128,patch_size=patch_size)
 validation_dataset = PatchDataGen("/sise/home/lionb/cell_generator/image_list_test.csv","channel_signal","channel_signal",8,patch_size=patch_size)

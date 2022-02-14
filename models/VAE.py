@@ -121,7 +121,7 @@ class VAE(keras.Model):
             )
             kl_loss = -0.5 * (1 + sigma - tf.square(mu) - tf.exp(sigma))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            total_loss = self.beta*reconstruction_loss + (1-self.beta)*kl_loss
+            total_loss = self.beta*reconstruction_loss + kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)

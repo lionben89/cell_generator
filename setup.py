@@ -21,7 +21,7 @@ requirements = [
     "cell_imaging_utils",
     "tqdm",
     "sklearn",
-    "opencv"
+    "opencv-python",
 ]
 
 

@@ -34,13 +34,10 @@ elif (gv.model_type == "AAE"):
     reconstruction_patch_0 = aae.generator(patchs).numpy() ##with sampling
     z_sample = sample_distribution(patchs.shape[0],gv.latent_dim) ##with out reference
     gen_patch = aae.decoder(z_sample).numpy()
-    mu,sigma,sampled_z = aae.encoder(patchs)
-    reconstruction_0 = aae.decoder(mu).numpy()
     for i in range(patchs.shape[0]):
         # ImageUtils.imsave(patchs[i],"input_patch_{}.tiff".format(i))
         ImageUtils.imsave(target_patchs[i],"target_patch_{}.tiff".format(i))
-        ImageUtils.imsave(reconstruction_patch_0[i],"aae_reconstruction_with_sampling_patch_{}.tiff".format(i))
-        ImageUtils.imsave(reconstruction_0[i],"aae_reconstruction_patch_{}.tiff".format(i))
+        ImageUtils.imsave(reconstruction_patch_0[i],"aae_reconstruction_patch_{}.tiff".format(i))
         ImageUtils.imsave(gen_patch[i],"aae_generated_patch_{}.tiff".format(i))
 
 elif (gv.model_type == "AE"):

@@ -1,8 +1,8 @@
 model_type = "AAE"
-model_path = "./model_aae_dim_16_256_256_ld_64_loss_ce_config_ne2ne"
+model_path = "./model_aae_dim_16_256_256_ld_64_loss_ce_config_ne2ne_Z"
 patch_size = (16,256,256,1) ## 2D: (1,*,*,1) , 3D: (*,*,*,1)
 latent_dim = 64
-number_epochs = 1000
+number_epochs = 2000
 batch_norm = False
 
 input = "channel_target"

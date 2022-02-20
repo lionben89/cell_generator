@@ -15,16 +15,6 @@ def sample_distribution(batch_size,latent_dim, mu=0,sigma=1.):
     samples = mu + tf.random.normal(shape=(batch_size, latent_dim),dtype=tf.float16) * sigma
     return samples
 
-class Sampling(keras.layers.Layer):
-    """Uses (mu, sigma) to sample z."""
-
-    def call(self, inputs):
-        mu, sigma = inputs
-        batch_size = tf.shape(mu)[0]
-        latent_dim = tf.shape(sigma)[1]
-        z = mu + tf.random.normal(shape=(batch_size, latent_dim),dtype=tf.float16) * sigma
-        return z
-
 def get_encoder(input_size,latent_dim,name="encoder"):
         
         if (input_size[0]==1): ## 2D image
@@ -59,16 +49,10 @@ def get_encoder(input_size,latent_dim,name="encoder"):
         x = keras.layers.Flatten()(x) #keras.layers.Dense(tf.math.reduce_prod(layer_dim), activation='relu', name="{}_fc_1".format(name))(keras.layers.Flatten()(x))
         
         
-        ## mu
-        mu = keras.layers.Dense(latent_dim, name="{}_mu".format(name))(x)
-        
-        ## sigma
-        sigma = keras.layers.Dense(latent_dim, name="{}_sigma".format(name))(x)
-        
         ## z
-        z = Sampling(name="{}_z".format(name))([mu,sigma])
+        z = keras.layers.Dense(latent_dim, name="{}_z".format(name))(x)
         
-        return keras.Model(input,[mu,sigma,z],name=name), np.int32((*layer_dim,filters)), filters
+        return keras.Model(input,z,name=name), np.int32((*layer_dim,filters)), filters
 
         
 def get_decoder(latent_dim,output_size,layer_dim,filters,name="decoder"):
@@ -177,14 +161,17 @@ class AAE(keras.Model):
             name="encoder_loss"
         )
         self.discriminator_latent_loss_tracker = keras.metrics.Mean(name="discriminator_latent_loss")
+        self.discriminator_latent_acc = keras.metrics.BinaryAccuracy(name="discriminator_latent_accuracy", dtype=None,threshold=0.5)
         self.discriminator_image_loss_tracker = keras.metrics.Mean(name="discriminator_image_loss")
+        self.discriminator_image_acc = keras.metrics.BinaryAccuracy(name="discriminator_image_accuracy", dtype=None,threshold=0.5)
         
     
-    def compile(self, d_latent_optimizer, d_image_optimizer, g_optimizer):
+    def compile(self, d_latent_optimizer, d_image_optimizer, g_optimizer, g_d_optimizer):
         super(AAE, self).compile()
         self.d_latent_optimizer = d_latent_optimizer
         self.d_image_optimizer = d_image_optimizer
         self.g_optimizer = g_optimizer
+        self.g_d_optimizer = g_d_optimizer
     
     @property
     def metrics(self):
@@ -194,6 +181,8 @@ class AAE(keras.Model):
             self.encoder_loss_tracker,
             self.discriminator_latent_loss_tracker,
             self.discriminator_image_loss_tracker,
+            self.discriminator_latent_acc,
+            self.discriminator_image_acc
         ]
 
     def train_step(self, data):
@@ -201,7 +190,7 @@ class AAE(keras.Model):
         batch_size = tf.shape(data[0])[0]
         # Train generator for reconstruction
         with tf.GradientTape() as tape:
-            mu, sigma, z = self.encoder(data[0])
+            z = self.encoder(data[0])
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
@@ -214,7 +203,7 @@ class AAE(keras.Model):
         
         # Train discriminator_image for real/fake identification
         with tf.GradientTape() as tape:
-            mu, sigma, z = self.encoder(data[0])
+            z = self.encoder(data[0])
             reconstruction = self.decoder(z)
             discriminator_input = tf.concat([reconstruction,data[0]],axis=0)
             discriminator_labels = tf.concat([tf.zeros_like(z)[:,:1], tf.ones_like(z)[:,:1]],axis=0)
@@ -227,10 +216,11 @@ class AAE(keras.Model):
         grads = tape.gradient(discriminator_image_loss, self.discriminator_image.trainable_weights)
         self.d_image_optimizer.apply_gradients(zip(grads, self.discriminator_image.trainable_weights))
         self.discriminator_image_loss_tracker.update_state(discriminator_image_loss) 
+        self.discriminator_image_acc.update_state(discriminator_labels,discriminator_predictions)
         
         # Train generator to fool discriminator_image
         with tf.GradientTape() as tape:
-            mu, sigma, z = self.encoder(data[0])
+            z = self.encoder(data[0])
             reconstruction = self.decoder(z)
             discriminator_input = tf.concat([reconstruction,data[0]],axis=0)
             generator_labels = tf.concat([tf.ones_like(z)[:,:1], tf.zeros_like(z)[:,:1]],axis=0)
@@ -241,12 +231,12 @@ class AAE(keras.Model):
             )
 
         grads = tape.gradient(generator_loss, self.generator.trainable_weights)
-        self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
+        self.g_d_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         self.generator_loss_tracker.update_state(generator_loss)                
         
         # Train discriminator_latent for real/fake identification
         with tf.GradientTape() as tape:
-            mu, sigma, z = self.encoder(data[0])
+            z = self.encoder(data[0])
             z_sample = sample_distribution(batch_size,z.shape[1])
             discriminator_input = tf.concat([z, z_sample],axis=0)
             discriminator_labels = tf.concat([tf.zeros_like(z)[:,:1], tf.ones_like(z)[:,:1]],axis=0)
@@ -259,10 +249,11 @@ class AAE(keras.Model):
         grads = tape.gradient(discriminator_latent_loss, self.discriminator_latent.trainable_weights)
         self.d_latent_optimizer.apply_gradients(zip(grads, self.discriminator_latent.trainable_weights))
         self.discriminator_latent_loss_tracker.update_state(discriminator_latent_loss)
+        self.discriminator_latent_acc.update_state(discriminator_labels,discriminator_predictions)
         
         # Train generator to fool discriminator_latent
         with tf.GradientTape() as tape:
-            mu, sigma, z = self.encoder(data[0])
+            z = self.encoder(data[0])
             z_sample = sample_distribution(batch_size,z.shape[1])
             discriminator_input = tf.concat([z, z_sample],axis=0)
             generator_labels = tf.concat([tf.ones_like(z)[:,:1], tf.zeros_like(z)[:,:1]],axis=0)
@@ -273,7 +264,7 @@ class AAE(keras.Model):
             )
             
         grads = tape.gradient(encoder_loss, self.encoder.trainable_weights)
-        self.g_optimizer.apply_gradients(zip(grads, self.encoder.trainable_weights))
+        self.g_d_optimizer.apply_gradients(zip(grads, self.encoder.trainable_weights))
         self.encoder_loss_tracker.update_state(encoder_loss)
         
         return {
@@ -281,10 +272,12 @@ class AAE(keras.Model):
             "discriminator_latent_loss": self.discriminator_latent_loss_tracker.result(),
             "discriminator_image_loss": self.discriminator_image_loss_tracker.result(),
             "generator_loss": self.generator_loss_tracker.result(),
-            "encoder_latent_loss":self.encoder_loss_tracker.result()
+            "encoder_latent_loss":self.encoder_loss_tracker.result(),
+            "discriminator_latent_acc": self.discriminator_latent_acc.result(),
+            "discriminator_image_acc": self.discriminator_image_acc.result(),
         }
         
     def call(self,input):
-        mu, sigma, z = self.encoder(input)
+        z = self.encoder(input)
         reconstruction = self.decoder(z)
         return reconstruction

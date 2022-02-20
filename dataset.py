@@ -26,7 +26,7 @@ class DataGen(keras.utils.Sequence):
     
     def __init__(self, image_list_csv, input_col, target_col,
                  batch_size,
-                 num_batches = 16,
+                 num_batches = 32,
                  patches_from_image = 1,
                  patch_size = (16,256,256,1),
                  input_as_y = False,

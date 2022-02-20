@@ -15,7 +15,7 @@ CONTINUE_TRAINING = True
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
-train_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,16,patch_size=gv.patch_size)
+train_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = 8,num_batches = 32,patch_size=gv.patch_size)
 # validation_dataset = DataGen(gv.test_ds_path,gv.input,gv.target,8,patch_size=gv.patch_size)
 
 
@@ -52,12 +52,12 @@ elif (gv.model_type == "AAE"):
     discriminator_image = get_discriminator_image(gv.patch_size)
     discriminator_image.summary()
     aae = AAE(encoder,decoder,gv.patch_size,discriminator_latent,discriminator_image)
-    aae.compile(keras.optimizers.Adam(learning_rate=0.00001), keras.optimizers.Adam(learning_rate=0.00001), keras.optimizers.Adam(learning_rate=0.0005))
+    aae.compile(d_latent_optimizer = keras.optimizers.Adam(learning_rate=0.00001), d_image_optimizer = keras.optimizers.Adam(learning_rate=0.00001), g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),g_d_optimizer = keras.optimizers.Adam(learning_rate=0.0001))
 
     if CONTINUE_TRAINING and os.path.exists(gv.model_path):
         aae_pt = keras.models.load_model(gv.model_path)
         aae.set_weights(aae_pt.get_weights())  
-    aae.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(50,gv.number_epochs),aae)])
+    aae.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(20,gv.number_epochs),aae)])
     
 elif (gv.model_type == "AE"):
     from models.AE import *

@@ -1,6 +1,7 @@
 import shutil
 import os
 import threading
+import tensorflow as tf
 import tensorflow.keras as keras
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from cell_imaging_utils.image.image_utils import ImageUtils
@@ -22,6 +23,16 @@ def mask_image_func(image_ndarray,mask_template_ndarray) -> np.ndarray:
     mask_ndarray = mask_template_ndarray
     return np.where(mask_ndarray==255,image_ndarray,np.zeros(image_ndarray.shape))
 
+def resize_image(patch_size,image):
+    # only donwsampling, so use nearest neighbor that is faster to run
+    resized_image = np.zeros(patch_size)
+    for i in range(image.shape[0]):
+        resized_image[i] = tf.image.resize(
+            image[i], (patch_size[1],patch_size[2]), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+        )
+    resized_image = tf.cast(resized_image, tf.float16) #/ 127.5 - 1.0
+    return resized_image
+
 class DataGen(keras.utils.Sequence):
     
     def __init__(self, image_list_csv, input_col, target_col,
@@ -29,15 +40,24 @@ class DataGen(keras.utils.Sequence):
                  num_batches = 32,
                  patches_from_image = 1,
                  patch_size = (16,256,256,1),
+                 min_precentage = 0,
+                 max_precentage = 1,
                  input_as_y = False,
+                 output_as_x = True,
                  crop_edge = True,
                  mask = True,
                  mask_col = 'membrane_seg',
                  norm = True,
                  dilate = True,
-                 dilate_kernel = np.ones((17,17),np.uint8)):
+                 dilate_kernel = np.ones((50,50),np.uint8),
+                 noise=False,
+                 resize = False,
+                 delete_cahce = False):
         
         self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(os.environ.get('SLURM_JOB_ID'))
+        if delete_cahce:
+            shutil.rmtree(self.new_path_origin)
+            
         self.df = DatasetMetadataSCV(image_list_csv,image_list_csv)
         self.n = self.df.get_shape()[0]
         self.input_col = input_col
@@ -46,13 +66,18 @@ class DataGen(keras.utils.Sequence):
         self.num_batches = num_batches
         self.patches_from_image = patches_from_image ## if 1 resize image to patch size if >1 then sample patches with patch size
         self.patch_size = patch_size
+        self.min_precentage = min_precentage
+        self.max_precentage = max_precentage
         self.input_as_y = input_as_y ## output of target and input in Y
+        self.output_as_x = output_as_x ## input of target and input in X
         self.crop_edge = crop_edge
         self.mask = mask
         self.mask_col = mask_col
         self.norm = norm
         self.dilate = dilate
         self.dilate_kernel = dilate_kernel
+        self.noise = noise
+        self.resize = resize
 
         
         self.patches_from_image = patches_from_image
@@ -83,10 +108,10 @@ class DataGen(keras.utils.Sequence):
     
     def fill_samples(self,i):
         for j in range(self.batch_size):
-            image_index = np.random.randint(self.n)
+            image_index = np.random.randint(int(self.n*self.min_precentage),int(self.n*self.max_precentage))
             
             image_path = self.df.get_item(image_index,'path_tiff')
-           
+
             input_image, input_new_file_path = self.get_image_from_ssd(image_path,self.input_col)
             target_image, target_new_file_path = self.get_image_from_ssd(image_path,self.target_col)
             if (input_image is None or target_image is None):
@@ -106,14 +131,17 @@ class DataGen(keras.utils.Sequence):
                     mask_image = ImageUtils.get_channel(image_ndarray,mask_index)
                     if (self.dilate):
                         for h in range(mask_image.shape[0]):
-                            cv2.dilate(mask_image[0,h,:,:],self.dilate_kernel,mask_image[0,h,:,:])   
+                            cv2.dilate(mask_image[0,h,:,:].astype(np.uint8),self.dilate_kernel,mask_image[0,h,:,:].astype(np.uint8))   
 
                 channel_index = int(self.df.get_item(image_index,self.input_col))
                 input_image = ImageUtils.get_channel(image_ndarray,channel_index) 
-                if (self.norm):
-                    input_image = ImageUtils.normalize(input_image,max_value=1.0,dtype=np.float32)             
                 if (self.mask):
                     input_image = mask_image_func(input_image,mask_image)
+                if (self.norm):
+                    input_image = ImageUtils.normalize(input_image,max_value=1.0,dtype=np.float16) 
+                    # input_image -= np.mean(input_image)
+                    # input_image /= np.std(input_image)            
+
                 
                 
                 if (self.target_col == self.input_col):
@@ -121,11 +149,15 @@ class DataGen(keras.utils.Sequence):
                 else:
                     channel_index = int(self.df.get_item(image_index,self.target_col))
                     target_image = ImageUtils.get_channel(image_ndarray,channel_index)
-                    if (self.norm):
-                        target_image = ImageUtils.normalize(target_image,max_value=1.0,dtype=np.float32)             
                     if (self.mask):
                         target_image = mask_image_func(target_image,mask_image)
-
+                    if (self.norm):
+                        target_image = ImageUtils.normalize(target_image,max_value=1.0,dtype=np.float16)             
+                        # target_image -= np.mean(target_image)
+                        # target_image /= np.std(target_image) 
+                if (self.noise):
+                    target_image +=np.random.normal(0,0.05,size=target_image.shape)
+                    target_image = np.clip(target_image,0,1)
                 input_image = np.expand_dims(input_image[0],axis=-1)
                 target_image = np.expand_dims(target_image[0],axis=-1)  
                 ImageUtils.imsave(input_image,input_new_file_path)                   
@@ -147,11 +179,15 @@ class DataGen(keras.utils.Sequence):
                     self.input_buffer[i*self.batch_size+j*self.patches_from_image+k] = input_patch
                     self.target_buffer[i*self.batch_size+j*self.patches_from_image+k] = target_patch
             else:
-                # Resize to patch size
-                # input_image = ndimage.zoom(input_image,[self.patch_size[0]/input_image.shape[0],1,1,1],mode="constant",cval=0,order=1,prefilter=False)
-                # target_image = ndimage.zoom(target_image,[self.patch_size[0]/target_image.shape[0],1,1,1],mode="constant",cval=0,order=1,prefilter=False)   
-                input_image = ImageUtils.to_shape(input_image,self.patch_size)
-                target_image = ImageUtils.to_shape(target_image,self.patch_size)
+                if (self.resize):
+                    # Resize to patch size
+                    input_image = ImageUtils.to_shape(input_image,(16,*self.patch_size[1:]))
+                    target_image = ImageUtils.to_shape(target_image,(16,*self.patch_size[1:]))
+                    input_image = resize_image(self.patch_size,input_image) #ndimage.zoom(input_image,[self.patch_size[0]/input_image.shape[0],1,1,1],mode="constant",cval=0,order=1,prefilter=False)
+                    target_image = resize_image(self.patch_size,target_image)#ndimage.zoom(target_image,[self.patch_size[0]/target_image.shape[0],1,1,1],mode="constant",cval=0,order=1,prefilter=False)   
+                else:
+                    input_image = ImageUtils.to_shape(input_image,self.patch_size)
+                    target_image = ImageUtils.to_shape(target_image,self.patch_size)
                 self.input_buffer[i*self.batch_size+j*self.patches_from_image] = input_image
                 self.target_buffer[i*self.batch_size+j*self.patches_from_image] = target_image
             
@@ -184,8 +220,9 @@ class DataGen(keras.utils.Sequence):
         # y1 = deepcopy(self.input_buffer[index*self.batch_size:(index+1)*self.batch_size])
         Y = self.target_buffer[index*num_samples:(index+1)*num_samples]
         if (self.input_as_y):
-            Y = tuple([X,Y])
-            
+            Y = [X,Y]
+        if (self.output_as_x):
+            X = [X,Y]
         return X,Y
     
     def __len__(self):

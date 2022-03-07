@@ -4,16 +4,17 @@ import global_vars as gv
 
 class SaveModelCallback(keras.callbacks.Callback):
     
-    def __init__(self, freq, model):
+    def __init__(self, freq, model, path=gv.model_path):
         super().__init__()
         self.freq = freq
         self.model = model
+        self.path = path
         self.epoch = 0
         
     def on_epoch_end(self, epoch, logs=None):
         self.epoch+=1
         if (self.epoch % self.freq == 0): 
-            self.model.save(gv.model_path,save_format="tf")
+            self.model.save(self.path,save_format="tf")
     
 
 # class CustomCallback(keras.callbacks.Callback):

@@ -26,7 +26,7 @@ def get_encoder(input_size,latent_dim,name="encoder"):
             conv_layer = keras.layers.Conv2D
         
         layer_dim = np.array(input_size[:-1],dtype=np.int32)
-        filters = 16
+        filters = 8
         
         input = keras.Input(shape=input_size)
         
@@ -120,20 +120,15 @@ def get_discriminator_image(input_size,name="discriminator_image"):
         
         
         ## downsampling layers          
-        while layer_dim[0] > 2:
+        while layer_dim[0] > 1:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             x = conv_layer(filters=filters,kernel_size=3,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
-            
-
-        ## flatten + dense layer
-        x = keras.layers.Flatten()(x) #keras.layers.Dense(tf.math.reduce_prod(layer_dim), activation='relu', name="{}_fc_1".format(name))(keras.layers.Flatten()(x))
-        x = keras.layers.Dense(128, activation="relu",name="{}_fc1".format(name))(x)
         
         ## output
-        output = keras.layers.Dense(1, activation="sigmoid",name="{}_output".format(name))(x)
+        output = conv_layer(filters=1, kernel_size=1, activation="sigmoid",name="{}_output".format(name))(x)
         
         return keras.Model(input,output,name=name)
     
@@ -193,10 +188,10 @@ class AAE(keras.Model):
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(data[1], reconstruction),axis=(1,2)
+                    keras.losses.mean_absolute_error(data[1], reconstruction),axis=(1,2)
                 )
             )
-        if (train):
+        if train:
             grads = tape.gradient(reconstruction_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
@@ -205,14 +200,16 @@ class AAE(keras.Model):
         with tf.GradientTape() as tape:
             z = self.encoder(data[0])
             reconstruction = self.decoder(z)
-            discriminator_input = tf.concat([reconstruction,data[1]],axis=0)
-            discriminator_labels = tf.concat([tf.zeros_like(z)[:,:1], tf.ones_like(z)[:,:1]],axis=0)
-            discriminator_input,discriminator_labels = shuffle(discriminator_input,discriminator_labels)
+            discriminator_input = reconstruction
             discriminator_predictions = self.discriminator_image(discriminator_input)
-            discriminator_image_loss = tf.reduce_mean(
-                keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),axis=0
-            )
-        if (train):
+            discriminator_labels = tf.zeros_like(discriminator_predictions)
+            discriminator_image_loss = keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True)
+            discriminator_input = data[1]
+            discriminator_predictions = self.discriminator_image(discriminator_input)
+            discriminator_labels = tf.ones_like(discriminator_predictions)
+            discriminator_image_loss = tf.concat([keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),discriminator_image_loss],axis=0)
+            discriminator_image_loss = tf.reduce_mean(discriminator_image_loss)
+        if train:            
             grads = tape.gradient(discriminator_image_loss, self.discriminator_image.trainable_weights)
             self.d_image_optimizer.apply_gradients(zip(grads, self.discriminator_image.trainable_weights))
         self.discriminator_image_loss_tracker.update_state(discriminator_image_loss) 
@@ -222,17 +219,21 @@ class AAE(keras.Model):
         with tf.GradientTape() as tape:
             z = self.encoder(data[0])
             reconstruction = self.decoder(z)
-            discriminator_input = tf.concat([reconstruction,data[1]],axis=0)
-            generator_labels = tf.concat([tf.ones_like(z)[:,:1], tf.zeros_like(z)[:,:1]],axis=0)
-            discriminator_input,generator_labels = shuffle(discriminator_input,generator_labels)
+            discriminator_input = reconstruction
             discriminator_predictions = self.discriminator_image(discriminator_input)
-            generator_loss = tf.reduce_mean(
-                keras.losses.binary_crossentropy(generator_labels, discriminator_predictions, from_logits=True),axis=0
-            )
-        if (train):
-            grads = tape.gradient(generator_loss, self.generator.trainable_weights)
+            discriminator_labels = tf.ones_like(discriminator_predictions)
+            discriminator_image_loss = keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True)
+            discriminator_input = data[1]
+            discriminator_predictions = self.discriminator_image(discriminator_input)
+            discriminator_labels = tf.zeros_like(discriminator_predictions)
+            discriminator_image_loss = tf.concat([keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),discriminator_image_loss],axis=0)
+            discriminator_image_loss = tf.reduce_mean(discriminator_image_loss)
+        
+        if train:            
+            grads = tape.gradient(discriminator_image_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
-        self.generator_loss_tracker.update_state(generator_loss)                
+        self.generator_loss_tracker.update_state(discriminator_image_loss) 
+        # self.discriminator_image_acc.update_state(discriminator_labels,discriminator_predictions)              
         
         # Train discriminator_latent for real/fake identification
         with tf.GradientTape() as tape:
@@ -245,7 +246,8 @@ class AAE(keras.Model):
             discriminator_latent_loss = tf.reduce_mean(
                 keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),axis=0
             )
-        if (train):
+        
+        if train:            
             grads = tape.gradient(discriminator_latent_loss, self.discriminator_latent.trainable_weights)
             self.d_latent_optimizer.apply_gradients(zip(grads, self.discriminator_latent.trainable_weights))
         self.discriminator_latent_loss_tracker.update_state(discriminator_latent_loss)
@@ -262,7 +264,8 @@ class AAE(keras.Model):
             encoder_loss = tf.reduce_mean(
                 keras.losses.binary_crossentropy(generator_labels, discriminator_predictions, from_logits=True),axis=0
             )
-        if (train):    
+
+        if train:                        
             grads = tape.gradient(encoder_loss, self.encoder.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.encoder.trainable_weights))
         self.encoder_loss_tracker.update_state(encoder_loss)
@@ -277,9 +280,9 @@ class AAE(keras.Model):
             "discriminator_image_acc": self.discriminator_image_acc.result(),
         }
         
-    def test_step(self, data, train=True):
-        return self.train_step(data,False)    
-    
+    def test_step(self, data):
+        return self.train_step(data,False)
+           
     def call(self,input):
         z = self.encoder(input)
         reconstruction = self.decoder(z)

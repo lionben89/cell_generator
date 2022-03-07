@@ -22,6 +22,8 @@ requirements = [
     "tqdm",
     "sklearn",
     "opencv-python",
+    "scipy",
+    "seaborn"
 ]
 
 

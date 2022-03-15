@@ -21,7 +21,7 @@ num_samples=250
 
 def plot_distribution_samples(decoder):
     slice_i = 8
-    num_samples_per_feature = 7
+    num_samples_per_feature = 3
     plt.rcParams["figure.figsize"] = (num_samples_per_feature*2,gv.latent_dim*2)
     generated_samples = []
     latent_samples = np.zeros(shape=(num_samples_per_feature,gv.latent_dim,gv.latent_dim))
@@ -105,7 +105,7 @@ def plot_correlation_one_to_rest(samples):
     
 
 def generate_samples(num_samples):
-    dataset = DataGen(gv.test_ds_path,gv.input,gv.target,batch_size=1,num_batches=num_samples,patch_size=gv.patch_size)
+    dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size=1,num_batches=num_samples,patch_size=gv.patch_size)
     samples = np.zeros(shape=(num_samples,gv.latent_dim))
 
     for i in range(num_samples):
@@ -119,10 +119,6 @@ def generate_samples(num_samples):
 
 aae = keras.models.load_model(gv.model_path)
 
-samples = generate_samples(num_samples)
-plot_distribuation_graph(samples)
-plot_tsne_graph(samples)
-plot_correlation_matrix(samples)
 # plot_correlation_one_to_rest(samples)
 plot_distribution_samples(aae.decoder)
 

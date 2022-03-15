@@ -11,20 +11,32 @@ tf.compat.v1.enable_eager_execution()
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
 
-test_dataset = DataGen(gv.test_ds_path,gv.input,gv.target,batch_size=8,num_batches=32,patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.9)
+test_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size=8,num_batches=32,patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.95)
 
 if (gv.model_type == "VAE"):
     from models.VAE import *
     vae = keras.models.load_model(gv.model_path)
 
-    patch_0 = test_dataset.__getitem__(0)[0]
-    mu,sigma,sampled_z = vae.encoder(patch_0)
-    sigma_zeros = tf.zeros(mu.shape)
-    reconstruction_z = Sampling()([mu,sigma_zeros])
-    reconstruction_patch_0 = vae.decoder(reconstruction_z).numpy()
-    for i in range(patch_0.shape[0]):
-        ImageUtils.imsave(patch_0[i],"vae_original_patch_{}.tiff".format(i))
-        ImageUtils.imsave(reconstruction_patch_0[i],"vae_reconstruction_patch_{}.tiff".format(i))
+    if (not os.path.exists("{}/predictions".format(gv.model_path))):
+        os.makedirs("{}/predictions".format(gv.model_path))
+    n = test_dataset.__len__()
+    ppc = 0
+    out = 0
+    for j in range(n):
+        patchs = test_dataset.__getitem__(j)[0]
+        target_patchs = test_dataset.__getitem__(j)[1]
+        prediction = vae(patchs).numpy()
+        for i in range(patchs.shape[0]):    
+            k = j*patchs.shape[0] +i
+            if k <10:
+                ImageUtils.imsave(patchs[i],"{}/predictions/input_patch_{}.tiff".format(gv.model_path,k))
+                ImageUtils.imsave(target_patchs[i],"{}/predictions/target_patch_{}.tiff".format(gv.model_path,k))
+                ImageUtils.imsave(prediction[i],"{}/predictions/prediction_patch_{}.tiff".format(gv.model_path,k))
+            p = pearson_corr(target_patchs[i],prediction[i])
+            
+            ppc+=p
+            print("pearson correlation for image {}: {}".format(k,p))
+    print("avg pearson correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
 
 elif (gv.model_type == "AAE"):
     from models.AAE import *
@@ -128,16 +140,17 @@ elif (gv.model_type == "SG"):
     for j in range(n):
         patchs = test_dataset.__getitem__(j)[0]
         target_patchs = test_dataset.__getitem__(j)[1]
-        z = sg.aae.encoder(patchs[1]).numpy()
-        z[:,2]-=1
+        target_unet = sg.unet(patchs).numpy()
+        z = sg.aae.encoder(target_unet).numpy()
+        z[:,35]=-2
         target_aae = sg.aae.decoder(z).numpy()
-        prediction =  sg.generator([patchs[0],z]).numpy()
+        prediction =  sg.generator([patchs,z]).numpy()
         prediction_unet = sg.unet(prediction).numpy()
-        target_unet = sg.unet(patchs[0]).numpy()
-        for i in range(patchs[0].shape[0]):
-            k = j*patchs[0].shape[0] +i
+        
+        for i in range(patchs.shape[0]):
+            k = j*patchs.shape[0] +i
             if k <10:
-                ImageUtils.imsave(patchs[0][i],"{}/predictions/input_patch_{}.tiff".format(gv.sg_model_path,k))
+                ImageUtils.imsave(patchs[i],"{}/predictions/input_patch_{}.tiff".format(gv.sg_model_path,k))
                 ImageUtils.imsave(target_patchs[i],"{}/predictions/target_patch_{}.tiff".format(gv.sg_model_path,k))
                 ImageUtils.imsave(prediction[i],"{}/predictions/adapted_input_patch_{}.tiff".format(gv.sg_model_path,k))
                 ImageUtils.imsave(target_aae[i],"{}/predictions/adapted_output_patch_{}.tiff".format(gv.sg_model_path,k))
@@ -147,6 +160,6 @@ elif (gv.model_type == "SG"):
             
             ppc+=p
             print("pearson correlation for image {}: {}".format(k,p))
-    print("avg pearson correlation: {}".format(ppc/((patchs[0].shape[0]*n)-out)))
+    print("avg pearson correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
     
     

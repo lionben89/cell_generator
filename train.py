@@ -20,7 +20,7 @@ CONTINUE_TRAINING = True
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
 train_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 64, patch_size=gv.patch_size,min_precentage=0,max_precentage=0.95)
-# validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = 4, num_batches = 2, patch_size=gv.patch_size,min_precentage=0.95,max_precentage=1)
+validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = 16, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.95,max_precentage=1)
 
 
 # (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
@@ -32,21 +32,21 @@ if (gv.model_type == "VAE"):
     encoder.summary()
     decoder = get_decoder(gv.latent_dim,gv.patch_size,layer_dim,filters)
     decoder.summary()
-    vae = VAE(encoder,decoder,beta=0.5) ## beta for reconstruction 1 for KL
+    vae = VAE(encoder,decoder,beta=1) ## beta for reconstruction 1 for KL
     vae.compile(optimizer=keras.optimizers.Adam(learning_rate=0.00001))
 
     if CONTINUE_TRAINING and os.path.exists(gv.model_path):
         vae_pt = keras.models.load_model(gv.model_path)
         vae.set_weights(vae_pt.get_weights())
         
-    checkpoint_callback = keras.callbacks.ModelCheckpoint(gv.model_path, save_best_only=True, save_weights_only=True, save_format="tf")
+    checkpoint_callback = SaveModelCallback(min(5,gv.number_epochs),vae)
     early_stop_callback = keras.callbacks.EarlyStopping(patience=20)
     callbacks = [checkpoint_callback,early_stop_callback]
-    vae.fit(train_dataset, epochs=gv.number_epochs, callbacks=callbacks) ## validation_data=validation_dataset,
+    vae.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=callbacks) ## validation_data=validation_dataset,
     vae.save(gv.model_path,save_format="tf")
     
 elif (gv.model_type == "AAE"):
-    from models.AAE_patch import *
+    from models.AAE import *
     encoder, layer_dim, filters = get_encoder(gv.patch_size,gv.latent_dim)
     encoder.summary()
     decoder = get_decoder(gv.latent_dim,gv.patch_size,layer_dim,filters)
@@ -56,12 +56,12 @@ elif (gv.model_type == "AAE"):
     discriminator_image = get_discriminator_image(gv.patch_size)
     discriminator_image.summary()
     aae = AAE(encoder,decoder,gv.patch_size,discriminator_latent,discriminator_image)
-    aae.compile(d_latent_optimizer = keras.optimizers.Adam(learning_rate=0.0001), d_image_optimizer = keras.optimizers.Adam(learning_rate=0.0001), g_optimizer = keras.optimizers.Adam(learning_rate=0.0001))
+    aae.compile(d_latent_optimizer = keras.optimizers.Adam(learning_rate=0.0000001), d_image_optimizer = keras.optimizers.Adam(learning_rate=0.000001), g_optimizer = keras.optimizers.Adam(learning_rate=0.00001))
 
     if CONTINUE_TRAINING and os.path.exists(gv.model_path):
         aae_pt = keras.models.load_model(gv.model_path)
         aae.set_weights(aae_pt.get_weights())  
-    aae.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(10,gv.number_epochs),aae)])
+    aae.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),aae)])
     
 elif (gv.model_type == "AE"):
     from models.AE import *
@@ -119,12 +119,12 @@ elif (gv.model_type == "UNET"):
     unet_model.summary()
     
     unet_model = UNET(unet_model)
-    unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=1e-05))
+    unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=1e-04))
     
     if CONTINUE_TRAINING and os.path.exists(gv.unet_model_path):
         unet_pt = keras.models.load_model(gv.unet_model_path)
         unet_model.set_weights(unet_pt.get_weights())  
-    unet_model.fit(train_dataset, epochs=gv.number_epochs, callbacks=[keras.callbacks.EarlyStopping(monitor="val_loss",patience=40,restore_best_weights=True),SaveModelCallback(min(20,gv.number_epochs),unet_model,gv.unet_model_path)])
+    unet_model.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[keras.callbacks.EarlyStopping(monitor="val_loss",patience=50,restore_best_weights=True),SaveModelCallback(min(5,gv.number_epochs),unet_model,gv.unet_model_path)])
     unet_model.save(gv.unet_model_path,save_format="tf")
     
 elif (gv.model_type == "SG"):
@@ -137,11 +137,11 @@ elif (gv.model_type == "SG"):
     aae = keras.models.load_model(gv.model_path)
     aae.summary()
     
-    # lp = get_latent_preprocessor(gv.latent_dim,gv.patch_size,(1,16,16,1))
-    # lp.summary()
+    lp = get_latent_preprocessor(gv.latent_dim,gv.patch_size,(1,16,16,1))
+    lp.summary()
     
-    lp = aae.decoder
-    lp.trainable = False
+    # lp = aae.decoder
+    # lp.trainable = False
     
     # adaptor = get_adaptor((*gv.patch_size[:-1],33))
     # adaptor.summary()
@@ -152,10 +152,11 @@ elif (gv.model_type == "SG"):
     discriminator_image.summary()
     
     sg = SampleGenerator(gv.latent_dim, gv.patch_size, lp, adaptor, discriminator_image, unet, aae)
-    sg.compile(d_optimizer = keras.optimizers.Adam(learning_rate=0.00001),g_optimizer = keras.optimizers.Adam(learning_rate=1e-04))
+    sg.summary()
     
+    sg.compile(d_optimizer = keras.optimizers.Adam(learning_rate=0.00001),g_optimizer = keras.optimizers.Adam(learning_rate=1e-04))
     if CONTINUE_TRAINING and os.path.exists(gv.sg_model_path):
         sg_pt = keras.models.load_model(gv.sg_model_path)
         sg.set_weights(sg_pt.get_weights())  
-    sg.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),sg,gv.sg_model_path)])
+    sg.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),sg,gv.sg_model_path)])
     sg.save(gv.sg_model_path,save_format="tf")

@@ -9,7 +9,7 @@ class Sampling(keras.layers.Layer):
         mu, sigma = inputs
         batch = tf.shape(mu)[0]
         dim = tf.shape(sigma)[1]
-        epsilon = keras.backend.random_normal(shape=(batch, dim))
+        epsilon = keras.backend.random_normal(shape=(batch, dim),dtype=tf.float16)
         return mu + tf.exp(0.5 * sigma) * epsilon
 
 def get_encoder(input_size,latent_dim,name="encoder"):
@@ -33,7 +33,7 @@ def get_encoder(input_size,latent_dim,name="encoder"):
         
         
         ## downsampling layers          
-        while layer_dim[0] > 4:
+        while layer_dim[0] > 1:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
@@ -109,21 +109,22 @@ class VAE(keras.Model):
             self.kl_loss_tracker,
         ]
 
-    def train_step(self, data):
-
+    def train_step(self, data, train=True):
+        data = tf.cast(data,dtype=tf.float16)
         with tf.GradientTape() as tape:
             mu, sigma, z = self.encoder(data[0])
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(data[1], reconstruction),axis=(1,2)
+                    keras.losses.mean_squared_error(data[1], reconstruction),axis=(2,3)
                 )
             )
             kl_loss = -0.5 * (1 + sigma - tf.square(mu) - tf.exp(sigma))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
             total_loss = self.beta*reconstruction_loss + kl_loss
-        grads = tape.gradient(total_loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        if train:            
+            grads = tape.gradient(total_loss, self.trainable_weights)
+            self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
@@ -134,26 +135,7 @@ class VAE(keras.Model):
         }      
     
     def test_step(self, data):    
-        mu, sigma, z = self.encoder(data[0])
-        reconstruction = self.decoder(z)
-        reconstruction_loss = tf.reduce_mean(
-            tf.reduce_sum(
-                keras.losses.mean_squared_error(data[1], reconstruction),axis=(1,2)
-            )
-        )
-        kl_loss = -0.5 * (1 + sigma - tf.square(mu) - tf.exp(sigma))
-        kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-        total_loss = reconstruction_loss + kl_loss
-        
-
-        self.total_loss_tracker.update_state(total_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
-        self.kl_loss_tracker.update_state(kl_loss)
-        return {
-            "loss": self.total_loss_tracker.result(),
-            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
-            "kl_loss": self.kl_loss_tracker.result(),
-        } 
+        return self.train_step(data,False)
     
     def call(self,input):
         mu, sigma, z = self.encoder(input)

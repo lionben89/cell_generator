@@ -11,11 +11,13 @@ class ReSampling(keras.layers.Layer):
         updates = []
         indices=[]
         batch_size = gv.batch_size
-        for i in range(batch_size):
-            col = sample_col()
-            change = sample_value(sigma)
-            indices.append([i,col])
-            updates.append(z[i,col]+change)
+        num_features = np.random.randint(0,16)
+        for j in range(num_features):
+            for i in range(batch_size):
+                col = sample_col()
+                change = sample_value(sigma)
+                indices.append([i,col])
+                updates.append(z[i,col]+change)
         
         z_new = tf.tensor_scatter_nd_update(z, indices, updates)
         return z_new
@@ -25,7 +27,7 @@ def sample_col():
 
 
 def sample_value(sigma):
-    return np.random.normal(0.0,sigma)
+    return np.random.uniform(-1.0*sigma,sigma)
 
 def get_adaptor(input_size,layers=[32,32,32,32],name="adaptor"):
         
@@ -143,12 +145,16 @@ class SampleGenerator(keras.Model):
         self.generator = keras.Model([image_input,latent_input],output,name="generator")
         
         
-        self.sigma = 0.5 #0.2
+        self.sigma = 0.0 #0.2
         self.sigma_count = 0
         self.resample = keras.Model(latent_input,ReSampling()(latent_input,self.sigma))
         
         self.unet_loss_tracker = keras.metrics.Mean(
             name="unet_loss"
+        )
+        
+        self.reconstruction_loss_tracker = keras.metrics.Mean(
+            name="reconstruction_loss"
         )
 
         self.discriminator_image_loss_tracker = keras.metrics.Mean(name="discriminator_image_loss")
@@ -160,7 +166,7 @@ class SampleGenerator(keras.Model):
         
 
     
-    def compile(self, d_optimizer, g_optimizer, unet_loss_weight=1, discriminator_loss_weight=4, reconstruction_loss_weight=0 ):
+    def compile(self, d_optimizer, g_optimizer, unet_loss_weight=1, discriminator_loss_weight=8, reconstruction_loss_weight=1):
         super(SampleGenerator, self).compile()
         self.d_image_optimizer = d_optimizer
         self.g_optimizer = g_optimizer
@@ -172,6 +178,7 @@ class SampleGenerator(keras.Model):
     def metrics(self):
         return [
             self.unet_loss_tracker,
+            self.reconstruction_loss_tracker,
             self.discriminator_image_loss_tracker,
             self.discriminator_image_acc,
             self.generator_loss_tracker,
@@ -179,42 +186,24 @@ class SampleGenerator(keras.Model):
 
     def train_step(self, data, train=True):
         data_0 = tf.cast(data[0],dtype=tf.float16)
-        data_1 = tf.cast(data[1],dtype=tf.float16)
+        # data_1 = tf.cast(data[1],dtype=tf.float16)
         
-        unet_original = self.unet(data_0[0])
+        unet_original = self.unet(data_0)
         z_original = self.aae.encoder(unet_original)
         
         z = self.resample(z_original,self.sigma)
         self.sigma_count+=1
-        if (self.sigma_count>=25 and self.sigma<2.0):
+        if (self.sigma_count>=20 and self.sigma<2.0):
             self.sigma+=0.1
             self.sigma_count=0
-                
-        # Train discriminator_image for real/fake identification
-        with tf.GradientTape() as tape:
-            adapted_image = self.generator([data_0[0],z])
-            discriminator_input = tf.concat([adapted_image,data_0[0]],axis=0)
-            discriminator_labels = tf.concat([tf.zeros_like(z)[:,:1], tf.ones_like(z)[:,:1]],axis=0)
-            discriminator_predictions = self.discriminator_image(discriminator_input)
-            discriminator_image_loss = tf.reduce_mean(
-                keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),axis=0
-            )
-            
-        if (train):
-            grads = tape.gradient(discriminator_image_loss, self.discriminator_image.trainable_weights)
-            self.d_image_optimizer.apply_gradients(zip(grads, self.discriminator_image.trainable_weights))
-        self.discriminator_image_loss_tracker.update_state(discriminator_image_loss) 
-        self.discriminator_image_acc.update_state(discriminator_labels,discriminator_predictions)
         
         # Train generator to fool discriminator_image and create target
         with tf.GradientTape() as tape:
-            adapted_image = self.generator([data_0[0],z])
-            discriminator_input = tf.concat([adapted_image,data_0[0]],axis=0)
+            adapted_image = self.generator([data_0,z])
+            discriminator_input = tf.concat([adapted_image,data_0],axis=0)
             generator_labels = tf.concat([tf.ones_like(z)[:,:1], tf.zeros_like(z)[:,:1]],axis=0)
             discriminator_predictions = self.discriminator_image(discriminator_input)
-            generator_loss = tf.reduce_mean(
-                keras.losses.binary_crossentropy(generator_labels, discriminator_predictions, from_logits=True),axis=0
-            )
+            generator_loss = keras.losses.binary_crossentropy(generator_labels, discriminator_predictions, from_logits=True)
             
             unet_predictions = self.unet(adapted_image)
             unet_target = self.aae.decoder(z)
@@ -226,9 +215,10 @@ class SampleGenerator(keras.Model):
             
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(data_0[0], adapted_image),axis=(2,3)
+                    keras.losses.mean_squared_error(data_0, adapted_image),axis=(2,3)
                 )
             )
+            self.reconstruction_loss_tracker.update_state(reconstruction_loss)
             self.unet_loss_tracker.update_state(unet_loss)  
              
             total_loss = tf.add(tf.multiply(tf.cast(self.unet_loss_weight,dtype=tf.float16),unet_loss),tf.multiply(tf.cast(self.discriminator_loss_weight,dtype=tf.float16),generator_loss))
@@ -240,18 +230,35 @@ class SampleGenerator(keras.Model):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         self.generator_loss_tracker.update_state(total_loss)   
+        
+        # Train discriminator_image for real/fake identification
+        with tf.GradientTape() as tape:
+            adapted_image = self.generator([data_0,z])
+            discriminator_input = tf.concat([adapted_image,data_0],axis=0)
+            discriminator_labels = tf.concat([tf.zeros_like(z)[:,:1], tf.ones_like(z)[:,:1]],axis=0)
+            discriminator_predictions = self.discriminator_image(discriminator_input)
+            discriminator_image_loss = tf.reduce_mean(
+                keras.losses.binary_crossentropy(discriminator_labels, discriminator_predictions, from_logits=True),axis=0
+            )
+            
+        if (train):
+            grads = tape.gradient(discriminator_image_loss, self.discriminator_image.trainable_weights)
+            self.d_image_optimizer.apply_gradients(zip(grads, self.discriminator_image.trainable_weights))
+        self.discriminator_image_loss_tracker.update_state(discriminator_image_loss) 
+        self.discriminator_image_acc.update_state(discriminator_labels,discriminator_predictions)
                
         return {
-            "unet_loss": self.unet_loss_tracker.result(),
-            "discriminator_image_loss": self.discriminator_image_loss_tracker.result(),
-            "generator_loss": self.generator_loss_tracker.result(),
-            "discriminator_image_acc": self.discriminator_image_acc.result(),
+            "unet": self.unet_loss_tracker.result(),
+            "reconstruction": self.reconstruction_loss_tracker.result(),
+            "generator": self.generator_loss_tracker.result(),
+            "discriminator": self.discriminator_image_loss_tracker.result(),
+            "discriminator_acc": self.discriminator_image_acc.result(),
         }
         
     def test_step(self, data, train=True):
         return self.train_step(data,False)    
     
     def call(self,input):
-        original_unet = self.unet(input[0])
+        original_unet = self.unet(input)
         z = self.aae.encoder(original_unet)
-        return self.generator([input[0],z])
+        return self.generator([input,z])

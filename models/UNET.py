@@ -26,20 +26,20 @@ def get_unet(input_size,name="unet"):
         while layer_dim[0] > 1:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
-            x = conv_layer(filters=filters,kernel_size=4,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv1_{}".format(name,layer_dim[0]))(x)
+            x = conv_layer(filters=filters,kernel_size=4,strides=2,padding='same',activation='relu',name="{}_conv1_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bn1_{}".format(name,layer_dim[0]))(x)
-            x = conv_layer(filters=filters,kernel_size=2,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv2_{}".format(name,layer_dim[0]))(x)
+            x = conv_layer(filters=filters,kernel_size=2,strides=1,padding='same',activation='relu',name="{}_conv2_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bn2_{}".format(name,layer_dim[0]))(x)
             skip_connection.append(x)
             
         ## bottleneck layer
         filters=filters*2
-        x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_bottleneck1".format(name))(x)
+        x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',activation='relu',name="{}_conv_bottleneck1".format(name))(x)
         if (gv.batch_norm):
             x = keras.layers.BatchNormalization(name="{}_bn_bottleneck1".format(name))(x)      
-        x = convt_layer(filters=filters/2,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_convt_bottleneck2".format(name))(x)
+        x = convt_layer(filters=filters/2,kernel_size=3,strides=1,padding='same',activation='relu',name="{}_convt_bottleneck2".format(name))(x)
         if (gv.batch_norm):
             x = keras.layers.BatchNormalization(name="{}_bn_bottleneck2".format(name))(x)        
             
@@ -49,17 +49,17 @@ def get_unet(input_size,name="unet"):
             x = tf.concat([x,skip_connection[i]],axis=-1)
             layer_dim = np.int32(layer_dim * 2)
             filters = filters / 2
-            x = convt_layer(filters=filters,kernel_size=4,strides=2,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_convt1_{}".format(name,layer_dim[0]))(x)
+            x = convt_layer(filters=filters,kernel_size=5,strides=2,padding='same',activation='relu',name="{}_convt1_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bnt1_{}".format(name,layer_dim[0]))(x)
-            x = convt_layer(filters=filters,kernel_size=2,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_convt2_{}".format(name,layer_dim[0]))(x)
+            x = convt_layer(filters=filters,kernel_size=3,strides=1,padding='same',activation='relu',name="{}_convt2_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bnt2_{}".format(name,layer_dim[0]))(x)  
             i=i-1              
       
 
         ## last conv same resulotion
-        output = conv_layer(filters=1, kernel_size=4,strides=1,padding='same',kernel_initializer='glorot_normal',activation="relu",name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
+        output = conv_layer(filters=1, kernel_size=4,strides=1,padding='same',activation="relu",name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
 
         return keras.Model(input,output,name=name)  
 

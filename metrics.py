@@ -17,7 +17,7 @@ def tf_pearson_corr(y_true, y_pred):
     return K.mean(r)
 
 def pearson_corr(a,b):
-    a_i = np.argwhere(a > 0.0)
+    a_i = np.argwhere(a > -0.1)
     a_new = a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
     b_new = b[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
     

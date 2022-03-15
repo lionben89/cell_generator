@@ -21,7 +21,7 @@ def slice_image(image_ndarray:np.ndarray, indexes:list)->np.ndarray:
 
 def mask_image_func(image_ndarray,mask_template_ndarray) -> np.ndarray:
     mask_ndarray = mask_template_ndarray
-    return np.where(mask_ndarray==255,image_ndarray,np.zeros(image_ndarray.shape))
+    return np.where(mask_ndarray>=127.5,image_ndarray,np.zeros(image_ndarray.shape))
 
 def resize_image(patch_size,image):
     # only donwsampling, so use nearest neighbor that is faster to run
@@ -43,13 +43,15 @@ class DataGen(keras.utils.Sequence):
                  min_precentage = 0,
                  max_precentage = 1,
                  input_as_y = False,
-                 output_as_x = True,
+                 output_as_x = False,
                  crop_edge = True,
                  mask = True,
-                 mask_col = 'membrane_seg',
+                 crop_mask_col = 'membrane_seg',
+                 input_mask_col = 'membrane_seg', #'structure_seg'
+                 target_mask_col = 'structure_seg',
                  norm = True,
                  dilate = True,
-                 dilate_kernel = np.ones((50,50),np.uint8),
+                 dilate_kernel = np.ones((7,7),np.uint8),
                  noise=False,
                  resize = False,
                  delete_cahce = False):
@@ -72,7 +74,9 @@ class DataGen(keras.utils.Sequence):
         self.output_as_x = output_as_x ## input of target and input in X
         self.crop_edge = crop_edge
         self.mask = mask
-        self.mask_col = mask_col
+        self.crop_mask_col = crop_mask_col
+        self.input_mask_col = input_mask_col
+        self.target_mask_col = target_mask_col
         self.norm = norm
         self.dilate = dilate
         self.dilate_kernel = dilate_kernel
@@ -99,7 +103,7 @@ class DataGen(keras.utils.Sequence):
         file_name = file_path.split('/')[-1]    
         new_file_path = "{}/{}_{}".format(self.new_path_origin,prefix,file_name)
         if os.path.exists(new_file_path):
-            image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(new_file_path))
+            image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(new_file_path)).astype(np.float16)
             return image_ndarray, new_file_path
         return None, new_file_path    
     
@@ -121,17 +125,17 @@ class DataGen(keras.utils.Sequence):
                 image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(image_path))
                 
                 if (self.crop_edge):
-                    mask_index = int(self.df.get_item(image_index,self.mask_col))
+                    mask_index = int(self.df.get_item(image_index,self.crop_mask_col))
                     mask_template = ImageUtils.get_channel(image_ndarray,mask_index)
                     image_ndarray = ImageUtils.crop_edges(image_ndarray,mask_template)
                     
                 mask_image = None
                 if (self.mask):
-                    mask_index = int(self.df.get_item(image_index,self.mask_col))
+                    mask_index = int(self.df.get_item(image_index,self.input_mask_col))
                     mask_image = ImageUtils.get_channel(image_ndarray,mask_index)
                     if (self.dilate):
-                        for h in range(mask_image.shape[0]):
-                            cv2.dilate(mask_image[0,h,:,:].astype(np.uint8),self.dilate_kernel,mask_image[0,h,:,:].astype(np.uint8))   
+                        for h in range(mask_image.shape[1]):
+                            mask_image[0,h,:,:] = cv2.dilate(mask_image[0,h,:,:].astype(np.uint8),self.dilate_kernel,mask_image[0,h,:,:].astype(np.uint8))   
 
                 channel_index = int(self.df.get_item(image_index,self.input_col))
                 input_image = ImageUtils.get_channel(image_ndarray,channel_index) 
@@ -140,13 +144,22 @@ class DataGen(keras.utils.Sequence):
                 if (self.norm):
                     input_image = ImageUtils.normalize(input_image,max_value=1.0,dtype=np.float16) 
                     # input_image -= np.mean(input_image)
-                    # input_image /= np.std(input_image)            
+                    # input_image /= np.std(input_image)  
+                if (self.noise):
+                    input_image +=np.random.normal(0,0.01,size=input_image.shape)
+                    # input_image = np.clip(input_image,0,1)          
 
                 
                 
                 if (self.target_col == self.input_col):
                     target_image = input_image
                 else:
+                    if (self.mask):
+                        mask_index = int(self.df.get_item(image_index,self.target_mask_col))
+                        mask_image = ImageUtils.get_channel(image_ndarray,mask_index)
+                        if (self.dilate):
+                            for h in range(mask_image.shape[1]):
+                                mask_image[0,h,:,:] = cv2.dilate(mask_image[0,h,:,:].astype(np.uint8),self.dilate_kernel,mask_image[0,h,:,:].astype(np.uint8))                       
                     channel_index = int(self.df.get_item(image_index,self.target_col))
                     target_image = ImageUtils.get_channel(image_ndarray,channel_index)
                     if (self.mask):
@@ -156,10 +169,10 @@ class DataGen(keras.utils.Sequence):
                         # target_image -= np.mean(target_image)
                         # target_image /= np.std(target_image) 
                 if (self.noise):
-                    target_image +=np.random.normal(0,0.05,size=target_image.shape)
-                    target_image = np.clip(target_image,0,1)
-                input_image = np.expand_dims(input_image[0],axis=-1)
-                target_image = np.expand_dims(target_image[0],axis=-1)  
+                    target_image +=np.random.normal(0,0.01,size=target_image.shape)
+                    # target_image = np.clip(target_image,0,1)
+                input_image = np.expand_dims(input_image[0],axis=-1).astype(np.float16)
+                target_image = np.expand_dims(target_image[0],axis=-1).astype(np.float16)
                 ImageUtils.imsave(input_image,input_new_file_path)                   
                 ImageUtils.imsave(target_image,target_new_file_path)                   
             if (self.patches_from_image > 1):

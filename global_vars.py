@@ -1,14 +1,14 @@
-model_type = "SG"
-model_path = "./model_aae_ne" ##_noise, _Z, _fl
+model_type = "UNET"
+model_path = "./aae_model_ne_15_03_22" #mask bn, ne, bf_2_ne, _ld_256
 latent_to_latent_model_path = "./model_ltol_dim_16_256_256_ld_64_config_bf2ne"
-unet_model_path = "./unet_model_nuclear_envelope_01_03_22" 
-sg_model_path = "./sg_model_nuclear_envelope_02_03_22_with_sampling_unet_adaptor_aae_decoder_lp_freeze" #_adaptor_64_filters #_adaptor #_unet_adaptor_aae_decoder_lp_freeze_corriculum #unet_adaptor_aae_decoder_lp_freeze
+unet_model_path = "./unet_model_ne_15_03_22" #no mask with bn
+sg_model_path = "./sg_model_ne_08_03_22" #no mask with bn, _ut_adaptor
 stylegan_path = "./stylegan"
 patch_size = (16,256,256,1) ## 2D: (1,*,*,1) , 3D: (*,*,*,1)
 latent_dim = 64
 number_epochs = 2000
-batch_size = 4
-batch_norm = False
+batch_size = 8
+batch_norm = True
 
 # input = "channel_target"
 input = "channel_signal"

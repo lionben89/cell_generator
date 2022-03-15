@@ -188,7 +188,7 @@ class AAE(keras.Model):
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_absolute_error(data[1], reconstruction),axis=(1,2)
+                    keras.losses.mean_squared_error(data[1], reconstruction),axis=(1,2)
                 )
             )
         if train:

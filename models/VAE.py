@@ -10,7 +10,7 @@ class Sampling(keras.layers.Layer):
         batch = tf.shape(mu)[0]
         dim = tf.shape(sigma)[1]
         epsilon = keras.backend.random_normal(shape=(batch, dim),dtype=tf.float16)
-        return mu + tf.exp(0.5 * sigma) * epsilon
+        return mu + sigma * epsilon
 
 def get_encoder(input_size,latent_dim,name="encoder"):
         
@@ -119,8 +119,9 @@ class VAE(keras.Model):
                     keras.losses.mean_squared_error(data[1], reconstruction),axis=(2,3)
                 )
             )
-            kl_loss = -0.5 * (1 + sigma - tf.square(mu) - tf.exp(sigma))
-            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+            batch = tf.shape(mu)[0]
+            dim = tf.shape(sigma)[1]
+            kl_loss = tf.reduce_mean(keras.losses.kl_divergence(keras.backend.random_normal(shape=(batch, dim),dtype=tf.float16),z))
             total_loss = self.beta*reconstruction_loss + kl_loss
         if train:            
             grads = tape.gradient(total_loss, self.trainable_weights)

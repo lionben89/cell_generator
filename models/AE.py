@@ -23,7 +23,7 @@ def get_encoder(input_size,name="encoder"):
         
         
         ## downsampling layers          
-        while layer_dim[0] > 4:
+        while layer_dim[0] > 1:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)
@@ -31,10 +31,10 @@ def get_encoder(input_size,name="encoder"):
             
 
         ## flatten + dense layer
-        z = keras.layers.BatchNormalization(name="{}_bn_dense_{}".format(name,layer_dim[0]))(x)
+        z = conv_layer(filters=1,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_convout".format(name))(x) #keras.layers.BatchNormalization(name="{}_bn_dense_{}".format(name,layer_dim[0]))(x)
         
 
-        return keras.Model(input,z,name=name), np.int32((*layer_dim,filters)), filters
+        return keras.Model(input,z,name=name), np.int32((*layer_dim,1)), filters
 
         
 def get_decoder(output_size,layer_dim,filters,name="decoder"):
@@ -49,7 +49,7 @@ def get_decoder(output_size,layer_dim,filters,name="decoder"):
         
         input = keras.Input(shape=(layer_dim))
         
-        x = keras.layers.BatchNormalization(name="{}_bn_dense_{}".format(name,layer_dim[0]))(input)
+        x = input #keras.layers.BatchNormalization(name="{}_bn_dense_{}".format(name,layer_dim[0]))(input)
 
         x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',kernel_initializer='glorot_normal',activation='relu',name="{}_conv_{}".format(name,layer_dim[0]))(x)
         x = keras.layers.BatchNormalization(name="{}_bn_{}".format(name,layer_dim[0]))(x)

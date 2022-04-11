@@ -21,7 +21,7 @@ num_samples=250
 
 def plot_distribution_samples(decoder):
     slice_i = 8
-    num_samples_per_feature = 3
+    num_samples_per_feature = 5
     plt.rcParams["figure.figsize"] = (num_samples_per_feature*2,gv.latent_dim*2)
     generated_samples = []
     latent_samples = np.zeros(shape=(num_samples_per_feature,gv.latent_dim,gv.latent_dim))
@@ -38,6 +38,8 @@ def plot_distribution_samples(decoder):
         column_images = generated_samples[i]
         for j in range(axs.shape[0]):
             image = column_images[j]#ndimage.zoom(column_images[j],[0.25,0.25],mode="constant",cval=0,order=1,prefilter=False)
+            if np.max(image)>0.0:
+                image = ImageUtils.normalize(image,max_value=1.0, dtype=np.float16)
             axs[j,i].imshow(image, cmap=plt.gray())
             # axs[j,i].set_axis_off()
             axs[j,i].set_xlabel("mu={}".format(sigmas[i]))
@@ -120,5 +122,9 @@ def generate_samples(num_samples):
 aae = keras.models.load_model(gv.model_path)
 
 # plot_correlation_one_to_rest(samples)
+samples = generate_samples(num_samples)
+plot_correlation_matrix(samples)
+plot_tsne_graph(samples)
+plot_distribuation_graph(samples)
 plot_distribution_samples(aae.decoder)
 

@@ -16,15 +16,13 @@ def tf_pearson_corr(y_true, y_pred):
     y_i = tf.where(y_true>0.0)
     x = y_true[y_i]
     y = y_pred[y_i]
-    mx = K.mean(x, axis=0)
-    my = K.mean(y, axis=0)
-    xm, ym = x - mx, y - my
-    r_num = K.sum(xm * ym)
-    x_square_sum = K.sum(xm * xm)
-    y_square_sum = K.sum(ym * ym)
-    r_den = K.sqrt(x_square_sum * y_square_sum)
-    r = r_num / r_den
-    return K.mean(r)
+    mean_x = tf.reduce_mean(x)
+    mean_y = tf.reduce_mean(y)
+    std_x = tf.math.reduce_std(x-mean_x)
+    std_y = tf.math.reduce_std(y-mean_y)
+    cc = tf.reduce_mean((x - mean_x) * (y - mean_y)) / (std_x * std_y)
+
+    return cc
 
 def pearson_corr(a,b):
     a_i = np.argwhere(a > 0.0)
@@ -41,3 +39,4 @@ def pearson_corr(a,b):
 def dice(a,b):
     k=1
     return np.sum(b[a==k])*2.0 / (np.sum(b) + np.sum(a) + 0.0001)
+

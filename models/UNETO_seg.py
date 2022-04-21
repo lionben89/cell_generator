@@ -85,22 +85,23 @@ def get_unet(input_size,activation="relu",name="unet"):
         return keras.Model(input,output,name=name)  
 
 class UNET(keras.Model):
-    def __init__(self, unet, **kwargs):
+    def __init__(self, unet,pre_unet, **kwargs):
         super(UNET, self).__init__(**kwargs)
         
         self.unet = unet
+        self.pre_unet = pre_unet
         
         self.loss_tracker = keras.metrics.Mean(
             name="loss"
         )
-        # self.acc_tracker = keras.metrics.MeanIoU(2,name="iou")
+        self.acc_tracker = keras.metrics.MeanIoU(2,name="iou")
         
     
     @property
     def metrics(self):
         return [
             self.loss_tracker,
-            # self.acc_tracker
+            self.acc_tracker
         ]
 
     def train_step(self, data, train=True):
@@ -109,12 +110,12 @@ class UNET(keras.Model):
         
         # Train unet
         with tf.GradientTape() as tape:
-            prediction = self.unet(data[0])
+            prediction = self.unet(self.pre_unet(data[0]))
            
-            loss = tf.reduce_mean(
+            loss = 0.001*tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(data[1], prediction),axis=(1,2)
-                ),axis=(0,1)
+                    keras.losses.mean_squared_error(data[1], prediction),axis=(1,2,3)
+                ),axis=0
             )
             # loss = keras.losses.binary_crossentropy(data[1], prediction)
             
@@ -123,17 +124,17 @@ class UNET(keras.Model):
             grads = tape.gradient(loss, self.unet.trainable_weights)
             self.optimizer.apply_gradients(zip(grads, self.unet.trainable_weights))
         self.loss_tracker.update_state(loss)
-        # self.acc_tracker.update_state(data[1], tf.math.round(prediction))
+        self.acc_tracker.update_state(data[1], tf.math.round(prediction))
         
         
         return {
             "loss": self.loss_tracker.result(),
-            # "iou": self.acc_tracker.result()
+            "iou": self.acc_tracker.result()
         }
         
     def test_step(self, data):
         return self.train_step(data,False)    
     
     def call(self,input):
-        prediction = (self.unet(input))
+        prediction = self.unet(self.pre_unet(input))
         return prediction

@@ -53,12 +53,13 @@ class DataGen(keras.utils.Sequence):
                  noise=False,
                  resize = False,
                  augment = True,
-                 delete_cahce = False):
+                 delete_cahce = False,
+                 predictors=None):
         
         self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(os.environ.get('SLURM_JOB_ID'))
         if delete_cahce:
             shutil.rmtree(self.new_path_origin)
-            
+                
         self.df = DatasetMetadataSCV(image_list_csv,image_list_csv)
         self.n = self.df.get_shape()[0]
         self.input_col = input_col
@@ -80,6 +81,7 @@ class DataGen(keras.utils.Sequence):
         self.noise = noise
         self.resize = resize
         self.augment = augment
+        self.predictors=predictors
 
         
         self.patches_from_image = patches_from_image
@@ -91,6 +93,7 @@ class DataGen(keras.utils.Sequence):
         else:
             self.input_buffer = np.zeros((self.buffer_size,*self.patch_size))
             self.target_buffer = np.zeros((self.buffer_size,*self.patch_size))
+            self.pred_buffer = np.zeros((self.buffer_size,*self.patch_size))
         
         if (not os.path.exists(self.new_path_origin)):
             os.makedirs(self.new_path_origin)
@@ -121,6 +124,8 @@ class DataGen(keras.utils.Sequence):
                 
             input_image, new_input_path = self.get_image_from_ssd(image_path,self.input_col,k)
             target_image, new_target_path = self.get_image_from_ssd(image_path,self.target_col,k)
+            if self.predictors is not None:
+                pred_image,new_prediction_path = self.get_image_from_ssd(image_path,"prediction",k)
             
             if (input_image is None or target_image is None):
                 image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(image_path))
@@ -170,7 +175,9 @@ class DataGen(keras.utils.Sequence):
                 target_image = np.expand_dims(target_image[0],axis=-1)                  
                 ImageUtils.imsave(input_image,new_input_path)
                 ImageUtils.imsave(target_image,new_target_path)
-                                 
+                
+
+                
             if (self.patches_from_image > 1):
                 #Sample patches 
                 # input_image = ImageUtils.to_shape(input_image,input_image.shape,None, min_shape=self.patch_size)
@@ -197,6 +204,14 @@ class DataGen(keras.utils.Sequence):
                 else:
                     input_image = ImageUtils.to_shape(input_image,self.patch_size)
                     target_image = ImageUtils.to_shape(target_image,self.patch_size)
+                    if self.predictors is not None:
+                        if pred_image is None and self.predictors is not None:
+                            organelle = image_path.split('/')[-1]                  
+                            organelle = organelle.split("_")[0]
+                            pred_image = self.predictors[organelle](np.expand_dims(input_image,axis=0)).numpy()
+                            ImageUtils.imsave(pred_image,new_prediction_path)
+                            self.pred_buffer[i*self.batch_size+j*self.patches_from_image] = pred_image
+                        
                 self.input_buffer[i*self.batch_size+j*self.patches_from_image] = input_image
                 self.target_buffer[i*self.batch_size+j*self.patches_from_image] = target_image
             
@@ -227,11 +242,14 @@ class DataGen(keras.utils.Sequence):
         num_samples = int(self.buffer_size/self.num_batches)
         X = self.input_buffer[index*num_samples:(index+1)*num_samples]
         # y1 = deepcopy(self.input_buffer[index*self.batch_size:(index+1)*self.batch_size])
+        P = self.pred_buffer[index*num_samples:(index+1)*num_samples]
         Y = self.target_buffer[index*num_samples:(index+1)*num_samples]
         if (self.input_as_y):
             Y = [X,Y]
         if (self.output_as_x):
             X = [X,Y]
+        if self.predictors is not None:
+            X = [X,P]
         return X,Y
     
     def __len__(self):

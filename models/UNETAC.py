@@ -4,7 +4,7 @@ import numpy as np
 import global_vars as gv
 
 
-def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
+def get_unet(input_size,activation="relu",name="unet"):
         
         if (input_size[0]==1): ## 2D image
             input_size = input_size[1:]
@@ -17,13 +17,13 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
             convt_layer = keras.layers.Conv2DTranspose
         
         layer_dim = np.array(input_size[:-1],dtype=np.int32)
-        filters = 16
+        filters = 32
         
         input = keras.Input(shape=input_size,dtype=tf.float16)
         skip_connection = []
         x = input
         ## downsampling layers          
-        while layer_dim[0] > 4:
+        while layer_dim[0] > 2:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             # i_x = x
@@ -37,7 +37,7 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
             x =keras.layers.ReLU()(x)
             skip_connection.append(x)
             # x = i_x + x
-            x = conv_layer(filters=filters,kernel_size=4,strides=2,padding='same',name="{}_convd_{}".format(name,layer_dim[0]))(x)
+            x = conv_layer(filters=filters,kernel_size=3,strides=2,padding='same',name="{}_convd_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bnd_{}".format(name,layer_dim[0]))(x)            
             x =keras.layers.ReLU()(x)
@@ -59,7 +59,7 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
         ## upsampling layers 
         i = len(skip_connection)-1
         while layer_dim[0] < input_size[0]:
-            x = convt_layer(filters=filters,kernel_size=4,strides=2,padding='same',name="{}_convtu_{}".format(name,layer_dim[0]))(x)
+            x = convt_layer(filters=filters,kernel_size=3,strides=2,padding='same',name="{}_convtu_{}".format(name,layer_dim[0]))(x)
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bntu_{}".format(name,layer_dim[0]))(x)  
             x =keras.layers.ReLU()(x)   
@@ -80,19 +80,28 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
       
 
         ## last conv same resulotion
-        output = conv_layer(filters=1, kernel_size=3,strides=1,padding='same',activity_regularizer=regularizer,activation=activation,dtype=tf.float64,name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
-#kernel_regularizer=regularizer
+        output = conv_layer(filters=1, kernel_size=3,strides=1,padding='same',activation=activation,dtype=tf.float32,name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
+
         return keras.Model(input,output,name=name)  
 
 class UNET(keras.Model):
-    def __init__(self, unet, **kwargs):
+    def __init__(self, unet, pm, **kwargs):
         super(UNET, self).__init__(**kwargs)
         
         self.unet = unet
-        
+        self.pm = pm
         self.loss_tracker = keras.metrics.Mean(
             name="loss"
         )
+        self.pm_loss_tracker = keras.metrics.Mean(
+            name="pm_loss"
+        )
+        self.total_loss_tracker = keras.metrics.Mean(
+            name="total_loss"
+        )
+        
+        self.target_acc = keras.metrics.BinaryAccuracy()
+        self.prediction_acc = keras.metrics.BinaryAccuracy()
         # self.acc_tracker = keras.metrics.MeanIoU(2,name="iou")
         
     
@@ -100,34 +109,48 @@ class UNET(keras.Model):
     def metrics(self):
         return [
             self.loss_tracker,
+            self.pm_loss_tracker,
+            self.total_loss_tracker,
+            self.target_acc,
+            self.prediction_acc,
             # self.acc_tracker
         ]
 
     def train_step(self, data, train=True):
         # data = tf.cast(data,dtype=tf.float16)
-        batch_size = tf.shape(data[0])[0]
+        # batch_size = tf.shape(data[0])[0]
         
         # Train unet
         with tf.GradientTape() as tape:
-            prediction = self.unet(data[0])
-           
+            prediction = self.unet(data[0][0])
+            # pm_prediction_target = self.pm(data[0])
+            # pm_prediction_unet = self.pm([data[0][0],prediction])
             loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(data[1], prediction),axis=(1,2,3)
+                    keras.losses.mean_squared_error(data[0][1], prediction),axis=(1,2,3)
                 ),axis=0
             )
-            # loss = keras.losses.binary_crossentropy(data[1], prediction)
+            pm_loss = 0 #keras.losses.mean_absolute_error(pm_prediction_target, pm_prediction_unet)
+            total_loss = 0.25 * loss + 1*pm_loss
             
 
         if (train):
-            grads = tape.gradient(loss, self.unet.trainable_weights)
+            grads = tape.gradient(total_loss, self.unet.trainable_weights)
             self.optimizer.apply_gradients(zip(grads, self.unet.trainable_weights))
-        self.loss_tracker.update_state(loss)
+        # self.loss_tracker.update_state(loss)
+        # self.pm_loss_tracker.update_state(pm_loss)
+        self.total_loss_tracker.update_state(total_loss)
+        # self.target_acc.update_state(tf.ones_like(pm_prediction_target),pm_prediction_target)
+        # self.prediction_acc.update_state(tf.ones_like(pm_prediction_unet),pm_prediction_unet)
         # self.acc_tracker.update_state(data[1], tf.math.round(prediction))
         
         
         return {
-            "loss": self.loss_tracker.result(),
+            # "loss": self.loss_tracker.result(),
+            # "pm_loss": self.pm_loss_tracker.result(),
+            "total_loss": self.total_loss_tracker.result(),
+            # "target_acc":self.target_acc.result(),
+            # "pred_acc":self.prediction_acc.result()
             # "iou": self.acc_tracker.result()
         }
         
@@ -135,5 +158,5 @@ class UNET(keras.Model):
         return self.train_step(data,False)    
     
     def call(self,input):
-        prediction = (self.unet(input))
+        prediction = self.unet(input[0])
         return prediction

@@ -4,7 +4,7 @@ import numpy as np
 import global_vars as gv
 
 
-def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
+def get_unet(input_size,activation="relu",name="unet"):
         
         if (input_size[0]==1): ## 2D image
             input_size = input_size[1:]
@@ -23,7 +23,7 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
         skip_connection = []
         x = input
         ## downsampling layers          
-        while layer_dim[0] > 4:
+        while layer_dim[0] > 8:
             layer_dim = np.int32(layer_dim / 2)
             filters = filters * 2
             # i_x = x
@@ -80,7 +80,7 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
       
 
         ## last conv same resulotion
-        output = conv_layer(filters=1, kernel_size=3,strides=1,padding='same',activity_regularizer=regularizer,activation=activation,dtype=tf.float64,name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
+        output = conv_layer(filters=1, kernel_size=3,strides=1,padding='same',activation=activation,dtype=tf.float64,name="{}_conv_{}_out".format(name,layer_dim[0]))(x)
 #kernel_regularizer=regularizer
         return keras.Model(input,output,name=name)  
 

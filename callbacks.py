@@ -1,20 +1,36 @@
+from curses import termattrs
 import tensorflow as tf
 import tensorflow.keras as keras
 import global_vars as gv
 
 class SaveModelCallback(keras.callbacks.Callback):
     
-    def __init__(self, freq, model, path=gv.model_path):
+    def __init__(self, freq, model, path=gv.model_path,monitor="val_loss",term=None,term_value=None):
         super().__init__()
         self.freq = freq
         self.model = model
         self.path = path
         self.epoch = 0
+        self.min_loss = 10000000
+        self.monitor = monitor
+        self.term  = term
+        self.term_value = term_value
         
     def on_epoch_end(self, epoch, logs=None):
         self.epoch+=1
-        if (self.epoch % self.freq == 0): 
-            self.model.save(self.path,save_format="tf")
+        save = False
+        print("current {} is :{}, min {} is:{}".format(self.monitor,logs[self.monitor],self.monitor,self.min_loss))
+        if (self.epoch % self.freq == 0 and logs[self.monitor]<self.min_loss):
+            if (self.term is not None and self.term_value is not None):
+                if (logs[self.term]> self.term_value):
+                    save = True
+            else:
+                save = True
+            if save:
+                print("saving model {}...".format(self.path))
+                self.min_loss =  logs[self.monitor]
+                self.model.save(self.path,save_format="tf")
+                print("model saved.")
     
 
 # class CustomCallback(keras.callbacks.Callback):

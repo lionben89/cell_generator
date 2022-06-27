@@ -68,9 +68,9 @@ def get_discriminator_image(input_size,name="discriminator_image"):
         return keras.Model(input,output,name=name)
 
    
-class ShuffleGenerator(keras.Model):
+class InputGenerator(keras.Model):
     def __init__(self, patch_size, adaptor, discriminator_image, unet, **kwargs):
-        super(ShuffleGenerator, self).__init__(**kwargs)
+        super(InputGenerator, self).__init__(**kwargs)
 
         self.discriminator_image = discriminator_image
         self.unet = unet
@@ -98,8 +98,8 @@ class ShuffleGenerator(keras.Model):
         
 
     
-    def compile(self, d_optimizer, g_optimizer, unet_loss_weight=1, discriminator_loss_weight=0, reconstruction_loss_weight=1):
-        super(ShuffleGenerator, self).compile()
+    def compile(self, d_optimizer, g_optimizer, unet_loss_weight=3, discriminator_loss_weight=0, reconstruction_loss_weight=1):
+        super(InputGenerator, self).compile()
         self.d_image_optimizer = d_optimizer
         self.g_optimizer = g_optimizer
         self.unet_loss_weight = unet_loss_weight
@@ -118,14 +118,14 @@ class ShuffleGenerator(keras.Model):
 
     def train_step(self, data, train=True):
         data_0 = data[0] #tf.cast(data[0],dtype=tf.float16)
-        # data_1 = tf.cast(data[1],dtype=tf.float16)
+        data_1 = data[1]# data_1 = tf.cast(data[1],dtype=tf.float16)
         
-        input_shuffled = tf.random.shuffle(data_0)
-        target_shuffled = self.unet(input_shuffled)
+        # input_shuffled = tf.random.shuffle(data_0)
+        prediction = self.unet(data_0)
         
         # Train generator to fool discriminator_image and create target
         with tf.GradientTape() as tape:
-            adapted_image = self.generator([data_0,target_shuffled])
+            adapted_image = self.generator([data_0,prediction])
             # discriminator_input = tf.concat([adapted_image,data_0],axis=0)
             # generator_labels = tf.concat([tf.ones_like(adapted_image)[:,:1,0,0,0], tf.zeros_like(adapted_image)[:,:1,0,0,0]],axis=0)
             # discriminator_predictions = self.discriminator_image(discriminator_input)
@@ -135,7 +135,7 @@ class ShuffleGenerator(keras.Model):
             
             unet_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.mean_squared_error(target_shuffled, unet_predictions),axis=(1,2)
+                    keras.losses.mean_squared_error(data_1, unet_predictions),axis=(1,2)
                 ),axis=(0,1)
             )
             # unet_loss = keras.losses.mean_squared_error(target_shuffled, unet_predictions)

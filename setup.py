@@ -23,7 +23,8 @@ requirements = [
     "sklearn",
     "opencv-python",
     "scipy",
-    "seaborn"
+    "seaborn",
+    "patchify"
 ]
 
 

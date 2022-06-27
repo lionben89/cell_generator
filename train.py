@@ -7,12 +7,11 @@ import global_vars as gv
 from callbacks import *
 from metrics import *
 from models.MaskGenerator import MaskGenerator
-from models.PMCNN import PMCNN
 from models.RegCNN import RegCNN, get_reg
 from models.ShuffleGenerator import ShuffleGenerator
 from models.ZeroGenerator import ZeroGenerator
 
-tf.compat.v1.enable_eager_execution()
+# tf.config.run_functions_eagerly(True)
 from tensorflow.keras import mixed_precision
 policy = mixed_precision.Policy('mixed_float16')
 mixed_precision.set_global_policy(policy)
@@ -21,10 +20,8 @@ mixed_precision.set_global_policy(policy)
 CONTINUE_TRAINING = True
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
-# ne_unet = keras.models.load_model("./unet_model_x_mse_2_3_nobn_ne")
-# ngc_unet = keras.models.load_model("./unet_model_x_mse_2_3_nobn")
-train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 80, patch_size=gv.patch_size,min_precentage=0,max_precentage=0.9,augment=True) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
-validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.9,max_precentage=1,augment=False) #,predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet})
+train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
+validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False) #,predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet})
 
 
 # (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
@@ -119,19 +116,18 @@ elif (gv.model_type == "L2LRes"):
 
 elif (gv.model_type == "UNET"):
     from models.UNETO import *
-    
-    unet_model = get_unet(gv.patch_size,activation="relu")
+    unet_model = get_unet(gv.patch_size,activation="linear")
     unet_model.summary()
     
-    unet_model = UNET(unet_model)
-    # unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001),loss=keras.losses.BinaryCrossentropy(from_logits=True,label_smoothing=0.1)) #,metrics=keras.metrics.MeanIoU(2)
-    unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001))
+    # unet_model = UNET(unet_model)
+    # unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001))
+    unet_model.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001),loss=keras.losses.MeanSquaredError())
     
     if CONTINUE_TRAINING and os.path.exists(gv.unet_model_path):
         unet_pt = keras.models.load_model(gv.unet_model_path)                           
         unet_model.set_weights(unet_pt.get_weights())  
-    checkpoint_callback = SaveModelCallback(min(5,gv.number_epochs),unet_model,gv.unet_model_path)
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=20)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),unet_model,gv.unet_model_path)
+    early_stop_callback = keras.callbacks.EarlyStopping(patience=30,monitor="val_loss",restore_best_weights=True)
     unet_model.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[checkpoint_callback,early_stop_callback])
     unet_model.save(gv.unet_model_path,save_format="tf")
 
@@ -188,29 +184,30 @@ elif (gv.model_type == "SG"):
     sg.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),sg,gv.sg_model_path)])
     sg.save(gv.sg_model_path,save_format="tf")
 
-elif (gv.model_type == "ShG"):
-    from models.ShuffleGenerator import *
+elif (gv.model_type == "ShG" or gv.model_type == "ShGD"):
+    from models.InputGenerator import *
     from models.UNETO import *
     
     unet = keras.models.load_model(gv.unet_model_path)
     unet.summary()
     
 
-    adaptor = get_unet((*gv.patch_size[:-1],64),activation="relu")
+    adaptor = get_unet((*gv.patch_size[:-1],64),activation="linear")
     adaptor.summary()
     
     discriminator_image = get_discriminator_image(gv.patch_size)
     discriminator_image.summary()
     
-    shg = ShuffleGenerator(gv.patch_size, adaptor, discriminator_image, unet)
-    shg.unet.trainable = True
+    shg = InputGenerator(gv.patch_size,adaptor, discriminator_image, unet)
+    shg.unet.trainable = False
     
     shg.compile(d_optimizer = keras.optimizers.Adam(learning_rate=0.00001),g_optimizer = keras.optimizers.Adam(learning_rate=0.0001))
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True,monitor="val_total loss")
+    early_stop_callback = keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True,monitor="val_total_loss")
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),shg,gv.shg_model_path,monitor="val_total_loss")
     if CONTINUE_TRAINING and os.path.exists(gv.shg_model_path):
         shg_pt = keras.models.load_model(gv.shg_model_path)
         shg.set_weights(shg_pt.get_weights())  
-    shg.fit(train_dataset, validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),shg,gv.shg_model_path),early_stop_callback])
+    shg.fit(train_dataset, validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[checkpoint_callback,early_stop_callback])
     shg.save(gv.shg_model_path,save_format="tf")
     
 elif (gv.model_type == "ZG"):
@@ -243,20 +240,33 @@ elif (gv.model_type == "MG"):
     unet = keras.models.load_model(gv.unet_model_path)
     unet.summary()
     
-    adaptor = get_adaptor((*gv.patch_size[:-1],32))
-    adaptor.summary()
-    # adaptor = get_unet((*gv.patch_size[:-1],32),activation="sigmoid")
+    # adaptor = get_adaptor((*gv.patch_size[:-1],32))
     # adaptor.summary()
+    
+    adaptor = get_unet((*gv.patch_size[:-1],64),activation="sigmoid") 
+    adaptor.summary()
     
     mg = MaskGenerator(gv.patch_size, adaptor, unet)
     mg.unet.trainable = False
     
-    mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0005))
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True,monitor="val_total loss")
+    
+    
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
     if CONTINUE_TRAINING and os.path.exists(gv.mg_model_path):
         mg_pt = keras.models.load_model(gv.mg_model_path)
-        mg.set_weights(mg_pt.get_weights())  
-    mg.fit(train_dataset, validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path),early_stop_callback])
+        mg.set_weights(mg_pt.get_weights())
+    
+    noise_scale = 5.0
+    mask_loss_weight=0.1
+    for i in range(20):
+        print("mask_loss_weight: ",mask_loss_weight)
+        print("noise_scale: ",noise_scale)
+        early_stop_callback = keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True,monitor="val_stop")
+        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
+        mg.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
+        mask_loss_weight = mask_loss_weight+0.01
+        # noise_scale +=0.1
+        
     mg.save(gv.mg_model_path,save_format="tf")
         
 elif (gv.model_type == "EAM"): #Explainable Adverserial Model
@@ -301,15 +311,42 @@ elif (gv.model_type == "RC"):
 elif (gv.model_type == "PM"):
     from models.PMCNN import *
     
-    pm = get_pm(gv.patch_size)
+    pm = get_pm((16,64,64,1))
     pm.summary()
     
-    pm = PMCNN(pm)
+    # pm = PMCNN(pm)
     
-    pm.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001))
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True,monitor="val_loss")
+    pm.compile(optimizer = keras.optimizers.Adam(learning_rate=0.000004),loss=keras.losses.binary_crossentropy ,metrics=[keras.metrics.BinaryAccuracy(),keras.metrics.Precision(),keras.metrics.Recall()]) #
+    early_stop_callback = keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True,monitor="val_loss")
     if CONTINUE_TRAINING and os.path.exists(gv.pm_model_path):
         pm_pt = keras.models.load_model(gv.pm_model_path)
         pm.set_weights(pm_pt.get_weights())  
-    pm.fit(train_dataset, validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(min(5,gv.number_epochs),pm,gv.pm_model_path),early_stop_callback])
+    FINE_TUNE = False
+    if FINE_TUNE:
+        for layer in pm.layers:
+            if layer.name != "pair_matching_denseout" and layer.name != "pair_matching_dense2":
+                layer.trainable = False
+        
+    train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0,max_precentage=0.9,augment=True,pairs=True,neg_ratio=1,cutoff=0.02,masking_pair=True)
+    validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.9,max_precentage=1,augment=False,pairs=True,neg_ratio=1,cutoff=0.02,masking_pair=True)
+    pm.fit(train_dataset, validation_data=validation_dataset, epochs=1000 ,callbacks=[SaveModelCallback(min(3,gv.number_epochs),pm,gv.pm_model_path),early_stop_callback])
     pm.save(gv.pm_model_path,save_format="tf")
+
+elif (gv.model_type == "SN"):
+    from models.SN import *
+    
+    pm1 = get_pm((16,64,64,1),name="pm1")
+    pm2 = get_pm((16,64,64,1),name="pm2")
+    pm1.summary()
+    
+    sn = SN((16,64,64,1),pm1,pm2)
+    
+    sn.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001))
+    # early_stop_callback = keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True,monitor="val_loss")
+    if CONTINUE_TRAINING and os.path.exists(gv.sn_model_path):
+        sn_pt = keras.models.load_model(gv.sn_model_path)
+        sn.set_weights(sn_pt.get_weights())  
+    for i in range(0,1):
+        train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 64, patch_size=gv.patch_size,min_precentage=0,max_precentage=0.9,augment=True,pairs=True,neg_ratio=i+1)
+        validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.9,max_precentage=1,augment=False,pairs=True,neg_ratio=i+1)
+        sn.fit(train_dataset, validation_data=validation_dataset, epochs=100*(i+1)*(i+1), callbacks=[SaveModelCallback(min(1,gv.number_epochs),sn,gv.sn_model_path)])

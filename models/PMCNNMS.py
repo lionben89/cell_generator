@@ -21,6 +21,7 @@ def get_pm(input_size,name="pair_matching"):
         bf_input = keras.Input(shape=input_size,dtype=tf.float16)
         prediction_input = keras.Input(shape=input_size,dtype=tf.float16)
         x = keras.layers.Concatenate(axis=-1)([bf_input,prediction_input])
+        y = None
         ## downsampling layers    
         while layer_dim[0] > 2:
             layer_dim = np.int32(layer_dim / 2)
@@ -37,13 +38,17 @@ def get_pm(input_size,name="pair_matching"):
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bnd_{}".format(name,layer_dim[0]))(x)            
             x =keras.layers.ReLU()(x)
-
+            y_temp = keras.layers.Flatten()(x)
+            y_temp = keras.layers.Dense(64,activation="relu")(y_temp)
+            if y is None:
+                y = y_temp
+            else:
+                y = keras.layers.Concatenate(axis=-1)([y,y_temp])
         ## last conv same resulotion
         # x = conv_layer(filters=1,kernel_size=3,strides=1,padding='same',name="{}_convdense".format(name))(x)
-        features = keras.layers.Flatten()(x)
-        x = keras.layers.Dense(512,activation="relu",dtype=tf.float32,name="{}_dense1".format(name))(features)
-        x = keras.layers.Dense(256,activation="relu",dtype=tf.float32,name="{}_dense2".format(name))(x)
-        output = keras.layers.Dense(1,activation="sigmoid",dtype=tf.float32,name="{}_denseout".format(name))(x)
+        # features = keras.layers.Flatten()(x)
+        y = keras.layers.Dense(64,activation="relu",dtype=tf.float32,name="{}_dense1".format(name))(y)
+        output = keras.layers.Dense(1,activation="sigmoid",dtype=tf.float32,name="{}_denseout".format(name))(y)
         
         return keras.Model([bf_input,prediction_input],output,name=name)  
 

@@ -17,7 +17,7 @@ def get_unet(input_size,activation="relu",name="unet"):
             convt_layer = keras.layers.Conv2DTranspose
         
         layer_dim = np.array(input_size[:-1],dtype=np.int32)
-        filters = 32
+        filters = 16
         
         input = keras.Input(shape=input_size,dtype=tf.float16)
         skip_connection = []
@@ -31,10 +31,10 @@ def get_unet(input_size,activation="relu",name="unet"):
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bn1_{}".format(name,layer_dim[0]))(x)
             x = keras.layers.ReLU()(x)
-            x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',name="{}_conv2_{}".format(name,layer_dim[0]))(x)
-            if (gv.batch_norm):
-                x = keras.layers.BatchNormalization(name="{}_bn2_{}".format(name,layer_dim[0]))(x)
-            x =keras.layers.ReLU()(x)
+            # x = conv_layer(filters=filters,kernel_size=3,strides=1,padding='same',name="{}_conv2_{}".format(name,layer_dim[0]))(x)
+            # if (gv.batch_norm):
+            #     x = keras.layers.BatchNormalization(name="{}_bn2_{}".format(name,layer_dim[0]))(x)
+            # x =keras.layers.ReLU()(x)
             skip_connection.append(x)
             # x = i_x + x
             x = conv_layer(filters=filters,kernel_size=3,strides=2,padding='same',name="{}_convd_{}".format(name,layer_dim[0]))(x)
@@ -70,10 +70,10 @@ def get_unet(input_size,activation="relu",name="unet"):
             if (gv.batch_norm):
                 x = keras.layers.BatchNormalization(name="{}_bnt1_{}".format(name,layer_dim[0]))(x)  
             x =keras.layers.ReLU()(x)
-            x = convt_layer(filters=filters,kernel_size=3,strides=1,padding='same',name="{}_convt2_{}".format(name,layer_dim[0]))(x)
-            if (gv.batch_norm):
-                x = keras.layers.BatchNormalization(name="{}_bnt2_{}".format(name,layer_dim[0]))(x)                  
-            x =keras.layers.ReLU()(x)
+            # x = convt_layer(filters=filters,kernel_size=3,strides=1,padding='same',name="{}_convt2_{}".format(name,layer_dim[0]))(x)
+            # if (gv.batch_norm):
+            #     x = keras.layers.BatchNormalization(name="{}_bnt2_{}".format(name,layer_dim[0]))(x)                  
+            # x =keras.layers.ReLU()(x)
             filters = filters / 2
             # x = i_x + x
             i=i-1              

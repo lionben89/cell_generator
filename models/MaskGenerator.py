@@ -61,6 +61,10 @@ class MaskGenerator(keras.Model):
             name="mask_ratio"
         )
         
+        self.mask_size = keras.metrics.Mean(
+            name="mask_size"
+        )
+        
         self.total_loss_tracker = keras.metrics.Mean(name = "total")
         
         self.pcc = keras.metrics.Mean(name = "pcc")
@@ -69,11 +73,12 @@ class MaskGenerator(keras.Model):
         
 
     
-    def compile(self, g_optimizer, unet_loss_weight=1. ,mask_loss_weight=0.01,run_eagerly=False, noise_scale=1.0):
+    def compile(self, g_optimizer, unet_loss_weight=1. ,mask_loss_weight=0.01,mask_size_loss_weight=0.002,run_eagerly=False, noise_scale=5.0):
         super(MaskGenerator, self).compile(run_eagerly=run_eagerly)
         self.g_optimizer = g_optimizer
         self.unet_loss_weight = unet_loss_weight
         self.mask_loss_weight = mask_loss_weight
+        self.mask_size_loss_weight = mask_size_loss_weight
         self.noise_scale = noise_scale
     
     @property
@@ -84,7 +89,8 @@ class MaskGenerator(keras.Model):
             self.blob_ratio,
             self.mask_ratio,
             self.pcc,
-            self.stop
+            self.stop,
+            self.mask_size
         ]
 
     def train_step(self, data, train=True):
@@ -97,9 +103,10 @@ class MaskGenerator(keras.Model):
         
         with tf.GradientTape() as tape:
             mask = self.generator([data_0,unet_target])
+            # mask = tf.cast(tf.where(mask>0.5,1.0,mask),dtype=tf.float64)
             # mask = self.generator(data_0)
                     
-            # mask_rounded_NOT_differentiable = tf.round(mask)
+            # mask_rounded_NOT_differentiable = tf.cast(tf.where(mask>0.5,1.0,0.0),dtype=tf.float64)#tf.round(mask)
             # mask = mask - tf.stop_gradient(mask - mask_rounded_NOT_differentiable)
             
             
@@ -116,11 +123,17 @@ class MaskGenerator(keras.Model):
             # adapted_image = tf.where(mask>0,data_0,blur_image)
             # adapted_image = mask*data_0#+(1-blob_mask)*blur_image
             
-            normal_noise = tf.random.normal(tf.shape(mask),stddev=self.noise_scale,dtype=tf.float64)
-            mask_noise = normal_noise*(1-mask)
-            adapted_image = data_0+mask_noise
+            normal_noise = tf.random.normal(tf.shape(mask),stddev=self.noise_scale,dtype=tf.float64) 
+            # normal_noise = tf.random.uniform(tf.shape(mask),maxval=self.noise_scale,dtype=tf.float64) 
+            adapted_image = (mask*data_0)+(normal_noise*(1-mask))
+            # inv_adapted_image = (normal_noise*data_0)+(data_0*(1-mask))
             
             unet_predictions = self.unet(adapted_image)
+            # inv_unet_predictions = self.unet(inv_adapted_image)
+            
+            # adapted_image_binary = (mask_binary*data_0)+(normal_noise*(1-mask_binary))
+            
+            # unet_predictions_binary = self.unet(adapted_image_binary)
             
             # unet_loss = keras.losses.mean_squared_error(unet_target, unet_predictions)  
             unet_loss = tf.reduce_mean(
@@ -135,6 +148,13 @@ class MaskGenerator(keras.Model):
             # l2 = tf.reduce_mean(tf.square(blob_mask))                
             
             mean_mask = tf.reduce_mean((mask)) #tf.math.log
+            # mask_size = tf.reduce_mean(mask_binary)
+            
+            # mask_size_loss = tf.reduce_mean(
+            #    tf.reduce_sum(
+            #       keras.losses.mean_squared_error(tf.zeros_like(mask), mask_binary),axis=(1,2)
+            #    ),axis=(0,1)
+            # )
             mask_loss = tf.reduce_mean(
                tf.reduce_sum(
                   keras.losses.mean_squared_error(tf.zeros_like(mask), mask),axis=(1,2)
@@ -147,9 +167,10 @@ class MaskGenerator(keras.Model):
             #    ),axis=(0,1)
             # )
             
-            pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,0.87)
+            pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,0.97)
+            # inv_pcc_loss = tf.math.abs(tf_pearson_corr(unet_target,inv_unet_predictions))
             
-            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (0.87-pcc_loss)*3000
+            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (0.97-pcc_loss)*5000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
             
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
@@ -160,13 +181,16 @@ class MaskGenerator(keras.Model):
         self.blob_ratio.update_state(tf.zeros_like(mask), mask)
         self.pcc.update_state(pcc_loss)
         self.total_loss_tracker.update_state(total_loss)
-        self.stop.update_state(0.87-pcc_loss + mean_mask)
+        # self.mask_size.update_state(inv_pcc_loss)
+        self.stop.update_state(0.97-pcc_loss + mean_mask)
+        
                
         return {
             "unet": self.unet_loss_tracker.result(),
-            "blob_ratio": self.blob_ratio.result(),
+            "binary_ratio": self.blob_ratio.result(),
             "mask_ratio": self.mask_ratio.result(),
             "total loss":self.total_loss_tracker.result(),
+            # "inv_pcc": self.mask_size.result(),
             "pcc":self.pcc.result(),
             "stop": self.stop.result()
         }

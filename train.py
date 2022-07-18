@@ -19,6 +19,10 @@ mixed_precision.set_global_policy(policy)
 # CONTINUE_TRAINING = False
 CONTINUE_TRAINING = True
 
+gv.unet_model_path = "./unet_model_22_05_22_ngc_128"
+gv.mg_model_path = "mg_model_ngc_10_06_22_5_0_new"
+gv.organelle = "Nucleolus-(Granular-Component)" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
+
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
 validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False) #,predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet})
@@ -251,20 +255,20 @@ elif (gv.model_type == "MG"):
     
     
     
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.92)
     if CONTINUE_TRAINING and os.path.exists(gv.mg_model_path):
         mg_pt = keras.models.load_model(gv.mg_model_path)
         mg.set_weights(mg_pt.get_weights())
     
     noise_scale = 5.0
     mask_loss_weight=0.1
-    for i in range(20):
+    for i in range(4):
         print("mask_loss_weight: ",mask_loss_weight)
         print("noise_scale: ",noise_scale)
-        early_stop_callback = keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True,monitor="val_stop")
-        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
+        early_stop_callback = keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True,monitor="val_stop")
+        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,mask_size_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
         mg.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
-        mask_loss_weight = mask_loss_weight+0.01
+        mask_loss_weight = mask_loss_weight+0.0
         # noise_scale +=0.1
         
     mg.save(gv.mg_model_path,save_format="tf")

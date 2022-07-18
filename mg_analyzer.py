@@ -1,4 +1,5 @@
 from copy import deepcopy
+import gc
 from numpy import dtype
 from scipy import signal
 import tensorflow as tf
@@ -12,6 +13,17 @@ from utils import *
 import os
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
+
+def predict(model,data,batch_size):    
+    batch_data = data.reshape((-1,batch_size,*gv.patch_size))
+    output = np.zeros_like(batch_data)
+    for i in range(batch_data.shape[0]):
+        batch_pred = model.predict_on_batch(batch_data[i])
+        output[i] = batch_pred
+    output = output.reshape(data.shape)
+    K.clear_session()
+    _ = gc.collect()
+    return output
 
 def _get_weights(shape):
     shape_in = shape
@@ -31,36 +43,100 @@ def _get_weights(shape):
 dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.9, augment=False)
 
 ## Choose images
-images = range(10)#range(dataset.df.get_shape()[0])
-
-## Create thresholds
-ths_start = 0.0
-ths_step = 0.1
-ths_stop = 1.1
-ths = np.arange(ths_start,ths_stop,ths_step)
+images = range(30)#range(dataset.df.get_shape()[0])
 
 ## Noise
-noise_scale = 1.3
+noise_scale = 5.0
 
+## Batch size
+batch_size=9
 
 ## Image center
-center_xy = [243,192]
+center_xy = [312,465]
+margin=[192,256]
 
 ## Patch steps
-xy_step = 32
+xy_step = 64
 z_step = 16
 
 ## Load model
 print("Loading model:",gv.mg_model_path)
 model = keras.models.load_model(gv.mg_model_path)
 
+def collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,image):
+    # Init indexes
+    pz = pz_start
+    px = px_start
+    py = py_start
+    
+    ## Collect patchs
+    print("collect patchs...")
+    patchs = []
+    while pz<=pz_end-gv.patch_size[0]:
+        while px<=px_end-gv.patch_size[1]:
+            while py<=py_end-gv.patch_size[2]: 
+                
+                ## Slice patch from input       
+                px_start_patch = px-px_start
+                py_start_patch = py-py_start    
+                s = [(pz,pz+gv.patch_size[0]),(px_start_patch,px_start_patch+gv.patch_size[1]),(py_start_patch,py_start_patch+gv.patch_size[2])]
+                patch = slice_image(image,s)
+                # seg_patch = slice_image(target_seg_image,s)
+                
+                patchs.append(patch)
+                
+                py+=xy_step
+            py=py_start  
+            px+=xy_step
+        px=px_start
+        pz+=z_step
+    return np.array(patchs)
 
-def analyze_th(is_agg = False):
+def assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,patchs,weights,assembled_image_shape):
+    print("assemble images from patchs...")
+    patchs = np.array(patchs)
+    assembled_images = np.zeros((patchs.shape[0],*assembled_image_shape))+0.00001
+    pz = pz_start
+    px = px_start
+    py = py_start 
+    i = 0
+    while pz<=pz_end - gv.patch_size[0]:
+        while px<=px_end-gv.patch_size[1]:
+            while py<=py_end-gv.patch_size[2]: 
+                px_start_patch = px-px_start
+                py_start_patch = py-py_start 
+                
+                ## Update with patchs
+                patch_slice = (slice(pz,pz+gv.patch_size[0]), slice(px_start_patch,px_start_patch+gv.patch_size[1]),slice(py_start_patch,py_start_patch+gv.patch_size[2]))
+                
+                for j in range(patchs.shape[0]):
+                    assembled_images[j][patch_slice] += patchs[j][i]*weights 
+                
+                py+=xy_step
+                i+=1
+            py=py_start  
+            px+=xy_step
+        px=px_start
+        pz+=z_step
+    return assembled_images
+
+def analyze_th(mode,mask_image=None):
+    ## Create thresholds
+    ths_start = 0.5
+    ths_step = 0.1
+    ths_stop = 1.1
+    ths = np.arange(ths_start,ths_stop,ths_step)
     ## Create main dir
-    if is_agg:
-        pred_path = "predictions_agg_binary_rev"
+    if mode=="agg":
+        pred_path = "predictions_agg"
+    elif mode=="loo":
+        pred_path = "predictions_loo"
+    elif mode=="mask":
+        pred_path = "predictions_masked"  
+        ths=["masked"]      
     else:
-        pred_path = "predictions_loo_binary_rev"
+        pred_path="predictions"
+        ths=["full"]
         
     dir_path = "{}/{}".format(gv.mg_model_path,pred_path)
     create_dir_if_not_exist(dir_path)
@@ -78,183 +154,75 @@ def analyze_th(is_agg = False):
         create_dir_if_not_exist("{}/{}".format(dir_path,image_index))
         
         ## Preprocess images
-        px_start=center_xy[0]-gv.patch_size[1]-xy_step
-        py_start=center_xy[1]-gv.patch_size[2]-xy_step
-        px_end=center_xy[0]+gv.patch_size[1]+xy_step
-        py_end=center_xy[1]+gv.patch_size[2]+xy_step
+        px_start=center_xy[0]-margin[0]-xy_step
+        py_start=center_xy[1]-margin[1]-xy_step
+        pz_start = 0
+        px_end=center_xy[0]+margin[0]+xy_step
+        py_end=center_xy[1]+margin[1]+xy_step
+        
         
         slice_by = [None,(px_start,px_end),(py_start,py_end)]
+        print("preprocess..")
         input_image,target_image,target_seg_image,nuc_image,mem_image = preprocess_image(dataset,image_index,[dataset.input_col,dataset.target_col,"structure_seg","channel_dna","channel_membrane"],slice_by=slice_by)
+        pz_end = input_image.shape[0]
         
         weights = None
-
-        ## Init predictions
-        unet_p = np.zeros_like(input_image)
-        d = np.zeros_like(input_image)+1e-4
-
-        # Init indexes
-        pz=0
-        px = px_start
-        py = py_start
         
         ## Collect patchs
-        input_patchs = []
-        while pz<=input_image.shape[0]-gv.patch_size[0]:
-            while px<=px_end-gv.patch_size[1]:
-                while py<=py_end-gv.patch_size[2]: 
-                    
-                    ## Slice patch from input       
-                    px_start_patch = px-px_start
-                    py_start_patch = py-py_start    
-                    s = [(pz,pz+gv.patch_size[0]),(px_start_patch,px_start_patch+gv.patch_size[1]),(py_start_patch,py_start_patch+gv.patch_size[2])]
-                    input_patch = slice_image(input_image,s)
-                    # seg_patch = slice_image(target_seg_image,s)
-                    
-                    input_patchs.append(input_patch)
-                    
-                    py+=xy_step
-                py=py_start  
-                px+=xy_step
-            px=px_start
-            pz+=z_step
+        input_patchs = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,input_image)
         
         ## Batch predict
         ## Predicte unet and mask
-        input_patchs = np.array(input_patchs)
-        unet_patchs_p = model.unet.predict(input_patchs,batch_size=8)
-        mask_patchs_p = model.predict(input_patchs,batch_size=8)
+        print("batch predict...")
+        unet_patchs_p = predict(model.unet,input_patchs,batch_size)#model.unet.predict(tf.convert_to_tensor(input_patchs),batch_size=batch_size)
+        mask_patchs_p = predict(model,input_patchs,batch_size)#model.predict(tf.convert_to_tensor(input_patchs),batch_size=batch_size)
         
         ## Create noise vector
-        normal_noise = tf.random.normal(tf.shape(mask_patchs_p),stddev=1.0,dtype=tf.float64)*noise_scale
+        normal_noise = tf.random.normal(tf.shape(mask_patchs_p),stddev=noise_scale,dtype=tf.float64)
+        # normal_noise = tf.random.uniform(tf.shape(mask_patchs_p),maxval=noise_scale,dtype=tf.float64)
         
         ## Back to image 
-        # Init indexes
-        pz=0
-        px = px_start
-        py = py_start 
-        i = 0
-        while pz<=input_image.shape[0]-gv.patch_size[0]:
-            while px<=px_end-gv.patch_size[1]:
-                while py<=py_end-gv.patch_size[2]: 
-                    px_start_patch = px-px_start
-                    py_start_patch = py-py_start 
-                    if weights is None:
-                        weights = _get_weights(input_patch.shape)
-                    
-                    ## Update with patchs
-                    patch_slice = (slice(pz,pz+gv.patch_size[0]), slice(px_start_patch,px_start_patch+gv.patch_size[1]),slice(py_start_patch,py_start_patch+gv.patch_size[2]))
-                    
-                    unet_p[patch_slice] += unet_patchs_p[i]*weights 
-                    d[patch_slice] += weights[0]
-                    
-                    py+=xy_step
-                    i+=1
-                py=py_start  
-                px+=xy_step
-            px=px_start
-            pz+=z_step
+        weights = _get_weights(input_patchs[0].shape)
+        unet_p,mask_p_full,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,mask_patchs_p,np.ones_like(mask_patchs_p)],weights,input_image.shape)
+        mask_p_full = mask_p_full/d
         
         for th in ths:
             print(th)
+            print("mask predict ...")
             create_dir_if_not_exist("{}/{}/{}".format(dir_path,image_index,th))
-            mask_p = np.zeros_like(input_image)
-            input_p = np.zeros_like(input_image)
-            unet_noise_p = np.zeros_like(input_image)
-            if (is_agg):
-                mask_patchs_p_term = tf.cast(tf.where(mask_patchs_p>th,0.0,1.0),tf.float64)
+            if mode=="mask" and mask_image is not None:
+                mask_image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(mask_image))/255.
+                mask_p_full = mask_p_full*(1.-mask_image_ndarray)
+            elif mode=="agg":
+                mask_p = tf.cast(tf.where(mask_p_full>th,1.0,0.0),tf.float64).numpy()
+            elif mode=="loo":
+                ## 1.0 no noise, 0.0 is noise
+                mask_p = tf.cast(tf.where(tf.math.logical_and(mask_p_full>(th-ths_step),mask_p_full<=th),1.0,0.0),tf.float64).numpy()
             else:
-                mask_patchs_p_term = tf.cast(tf.where(tf.math.logical_and(mask_patchs_p>(th-ths_step),mask_patchs_p<=th),0.0,1.0),tf.float64)
+                mask_p = mask_p_full
             
             ## Create noisy input and predict unet
+            mask_patchs_p_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,mask_p)
             mask_noise_patchs = (normal_noise*(1-mask_patchs_p_term))
-            input_patchs_p = input_patchs+mask_noise_patchs
-            unet_noise_patchs_p = model.unet.predict(input_patchs_p,batch_size=8)
+            input_patchs_p = (mask_patchs_p_term*input_patchs)+mask_noise_patchs
+            unet_noise_patchs_p = predict(model.unet,input_patchs_p.numpy(),batch_size)#model.unet.predict(tf.convert_to_tensor(input_patchs_p),batch_size=batch_size)
     
             ## Back to image 
-            # Init indexes
-            pz=0
-            px = px_start
-            py = py_start 
-            i = 0
-            while pz<=input_image.shape[0]-gv.patch_size[0]:
-                while px<=px_end-gv.patch_size[1]:
-                    while py<=py_end-gv.patch_size[2]: 
-                        px_start_patch = px-px_start
-                        py_start_patch = py-py_start 
-                        if weights is None:
-                            weights = _get_weights(input_patch.shape)
-                        
-                        ## Update with patchs
-                        patch_slice = (slice(pz,pz+gv.patch_size[0]), slice(px_start_patch,px_start_patch+gv.patch_size[1]),slice(py_start_patch,py_start_patch+gv.patch_size[2]))
-                        
-                        mask_p[patch_slice] += mask_patchs_p_term[i]*weights #mask_patch_p*weights 
-                        input_p[patch_slice] += input_patchs_p[i]*weights 
-                        unet_noise_p[patch_slice] += unet_noise_patchs_p[i]*weights 
-                        
-                        py+=xy_step
-                        i+=1
-                    py=py_start  
-                    px+=xy_step
-                px=px_start
-                pz+=z_step
+            input_p,unet_noise_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p],weights,input_image.shape)
+            
             ## Save images
+            print("saving mask images...")
             base_save = "{}/{}/{}/".format(dir_path,image_index,th)
-            ImageUtils.imsave(mask_p/d,"{}/mask_{}.tiff".format(base_save,image_index))
-            # ImageUtils.imsave(input_p/d,"{}/noisy_input_{}.tiff".format(base_save,image_index))
+            ImageUtils.imsave(mask_p,"{}/mask_{}.tiff".format(base_save,image_index))
+            ImageUtils.imsave(input_p/d,"{}/noisy_input_{}.tiff".format(base_save,image_index))
             ImageUtils.imsave(unet_noise_p/d,"{}/noisy_unet_prediction_{}.tiff".format(base_save,image_index))  
             pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:])
-            mask_size = np.sum(mask_p/d,dtype=np.float64)
+            mask_size = np.sum(mask_p,dtype=np.float64)
             pccs.append(pcc)
             mask_sizes.append(mask_size)
             print("pearson corr for image:{} is :{}, mask ratio:{}".format(image_index,pcc,mask_size))
         
-        ## Old version         
-        # while pz<=input_image.shape[0]-gv.patch_size[0]:
-        #     while px<=px_end-gv.patch_size[1]:
-        #         while py<=py_end-gv.patch_size[2]: 
-                    
-        #             ## Slice patch from input       
-        #             px_start_patch = px-px_start
-        #             py_start_patch = py-py_start    
-        #             s = [(pz,pz+gv.patch_size[0]),(px_start_patch,px_start_patch+gv.patch_size[1]),(py_start_patch,py_start_patch+gv.patch_size[2])]
-        #             input_patch = slice_image(input_image,s)
-        #             # seg_patch = slice_image(target_seg_image,s)
-                    
-        #             if weights is None:
-        #                 weights = _get_weights(input_patch.shape)
-                    
-        #             ## Predicte unet and mask
-        #             unet_patch_p = model.unet(np.expand_dims(input_patch,axis=0))
-        #             mask_patch_p = model(np.expand_dims(input_patch,axis=0))
-                    
-        #             ## Create noise vector
-        #             normal_noise = tf.random.normal(tf.shape(mask_patch_p),stddev=1.0,dtype=tf.float64)*noise_scale
-                    
-        #             if (is_agg):
-        #                 mask_patch_p_term = tf.cast(tf.where(mask_patch_p>th,0.0,1.0),tf.float64)
-        #             else:
-        #                 mask_patch_p_term = tf.cast(tf.where(tf.math.logical_and(mask_patch_p>(th-ths_step),mask_patch_p<=th),0.0,1.0),tf.float64)
-                        
-        #             ## Create noisy input and predict unet
-        #             mask_noise_patch = (normal_noise*(1-mask_patch_p_term))
-        #             input_patch_p = input_patch+mask_noise_patch
-        #             unet_noise_patch_p = model.unet(input_patch_p)
-                    
-        #             ## Update with patchs
-        #             patch_slice = (slice(pz,pz+gv.patch_size[0]), slice(px_start_patch,px_start_patch+gv.patch_size[1]),slice(py_start_patch,py_start_patch+gv.patch_size[2]))
-                    
-        #             unet_p[patch_slice] += unet_patch_p*weights 
-        #             mask_p[patch_slice] += mask_patch_p_term*weights #mask_patch_p*weights 
-        #             input_p[patch_slice] += input_patch_p*weights 
-        #             unet_noise_p[patch_slice] += unet_noise_patch_p*weights 
-        #             d[patch_slice] += weights[0]
-                    
-        #             py+=xy_step
-        #         py=py_start  
-        #         px+=xy_step
-        #     px=px_start
-        #     pz+=z_step
-        
+        print("saving global images...")
         image_save = "{}/{}/".format(dir_path,image_index)
         ImageUtils.imsave(input_image,"{}/input_{}.tiff".format(image_save,image_index))
         ImageUtils.imsave(target_image,"{}/target_{}.tiff".format(image_save,image_index))
@@ -337,7 +305,8 @@ def analyze_correlations(organelles):
                         mask_patch_p = model(np.expand_dims(input_patch,axis=0))
                         
                         ## Create noise vector
-                        normal_noise = tf.random.normal(tf.shape(mask_patch_p),stddev=1.0,dtype=tf.float64)*noise_scale
+                        normal_noise = tf.random.normal(tf.shape(mask_patch_p),stddev=noise_scale,dtype=tf.float64)
+                        # normal_noise = tf.random.uniform(tf.shape(mask_patch_p),maxval=noise_scale,dtype=tf.float64)
                         mask_patch_p_term = np.where(seg_patch>0,0.0,mask_patch_p)
                             
                         ## Create noisy input and predict unet
@@ -404,9 +373,10 @@ def analyze_correlations(organelles):
             corr_results.set_item(image_index,"correlation_ratio",np.sum(correlation_p,dtype=np.float64)/np.sum(normalized_mask_p,dtype=np.float64))
             
         corr_results.create()
-    
-analyze_th(is_agg=True)
-analyze_th(is_agg=False)
+
+analyze_th("regular",mask)    
+# analyze_th("agg")
+# analyze_th("loo")
 # analyze_correlations(organelles=["Nuclear-envelope","Endoplasmic-reticulum","Plasma-membrane","Desmosomes","Golgi","Microtubules","Actin-filaments","Nucleolus-(Dense-Fibrillar-Component)","Mitochondria","Endoplasmic-reticulum","Tight-junctions","Nucleolus-(Granular-Component)","Actomyosin-bundles"])
             
                 

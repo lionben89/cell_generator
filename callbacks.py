@@ -5,7 +5,7 @@ import global_vars as gv
 
 class SaveModelCallback(keras.callbacks.Callback):
     
-    def __init__(self, freq, model, path=gv.model_path,monitor="val_loss",term=None,term_value=None):
+    def __init__(self, freq, model, path=gv.model_path,monitor="val_loss",term=None,term_value=None,save_all=False):
         super().__init__()
         self.freq = freq
         self.model = model
@@ -15,14 +15,15 @@ class SaveModelCallback(keras.callbacks.Callback):
         self.monitor = monitor
         self.term  = term
         self.term_value = term_value
+        self.save_all = save_all
         
     def on_epoch_end(self, epoch, logs=None):
         self.epoch+=1
         save = False
         print("current {} is :{}, min {} is:{}".format(self.monitor,logs[self.monitor],self.monitor,self.min_loss))
         if (self.epoch % self.freq == 0 and logs[self.monitor]<self.min_loss):
-            if (self.term is not None and self.term_value is not None):
-                if (logs[self.term]> self.term_value):
+            if ((self.term is not None and self.term_value is not None) or self.save_all):
+                if (logs[self.term]> self.term_value) or self.save_all:
                     save = True
             else:
                 save = True

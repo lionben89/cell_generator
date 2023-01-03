@@ -15,6 +15,30 @@ from sklearn.neighbors import KernelDensity
 
 tf.compat.v1.enable_eager_execution()
 
+
+gv.model_type = "CLF"
+for_clf = (gv.model_type == "CLF")
+gv.unet_model_path = "./unet_model_22_05_22_actin_128p_save_bs4-1"
+gv.clf_model_path = "./clf_model_14_12_22-1"
+gv.organelle = "Actin-filaments" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+#"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
+if gv.model_type == "CLF":
+    gv.input = "channel_target"
+    gv.target = "channel_target"
+    gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
+    gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
+else:
+    gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
+norm_type = "minmax" #"minmax"#"std"#
+gv.patch_size = (32,128,128,1)
+
+compound = None #"rapamycin" #"paclitaxol" #"blebbistatin" #None #"staurosporine"
+if compound is not None:
+    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
+else:
+    ds_path = gv.test_ds_path
+    
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
 def _get_weights(shape):
@@ -31,8 +55,16 @@ def _get_weights(shape):
         #weights = weights * np.ones(size)[tuple(slicey)]
     return np.broadcast_to(weights, shape_in).astype(np.float32)
 
-# test_dataset = DataGen(gv.test_ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False)
-test_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.9, augment=False)
+def normalize(image_ndarray,max_value=255,dtype=np.uint8) -> np.ndarray:
+    image_ndarray = image_ndarray.astype(np.float64)
+    max_var = np.max(image_ndarray!=np.inf)
+    image_ndarray = np.where(image_ndarray==np.inf,max_var,image_ndarray)
+    temp_image = image_ndarray-np.min(image_ndarray)
+    return ((temp_image)/((np.max(temp_image))*max_value)).astype(dtype)
+
+test_dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False, norm_type=norm_type)
+# test_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.9, augment=False)
+
 def euclidean_distance(x,y):
         sum_square = tf.math.reduce_sum(tf.math.square(x - y), keepdims=True)
         return tf.math.sqrt(tf.math.maximum(sum_square, tf.keras.backend.epsilon()))
@@ -191,6 +223,12 @@ elif (gv.model_type == "L2LRes"):
         print("pearson correlation for image {}: {}".format(
             i, pearson_corr(target_patchs[i], prediction[i])))
 
+elif (gv.model_type == "CLF"):
+    clf = keras.models.load_model(gv.clf_model_path)
+    dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 4, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False, for_clf=for_clf)
+    for i in range(20):
+        clf.evaluate(dataset)
+        
 elif (gv.model_type == "UNET"):
     unet = keras.models.load_model(gv.unet_model_path)
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
@@ -243,22 +281,26 @@ elif (gv.model_type == "UNET"):
             target_image = ImageUtils.get_channel(image_ndarray,channel_index)
             input_image = np.expand_dims(input_image[0], axis=-1)
             target_image = np.expand_dims(target_image[0], axis=-1)
-            target_mean = np.mean(target_image,dtype=np.float64)
-            target_std = np.std(target_image,dtype=np.float64)
-            target_image = (target_image-target_mean)/target_std
-            max_var = np.max(input_image!=np.inf)
-            input_image = np.where(input_image==np.inf,max_var,input_image)
-            input_mean = np.mean(input_image,dtype=np.float64)
-            input_std = np.std(input_image,dtype=np.float64)
-            input_image = (input_image-input_mean)/input_std
+            if norm_type == "minmax":
+                target_image = normalize(target_image,max_value=1.0,dtype=np.float32)
+                input_image = normalize(input_image,max_value=1.0,dtype=np.float32)
+            else:
+                target_mean = np.mean(target_image,dtype=np.float64)
+                target_std = np.std(target_image,dtype=np.float64)
+                target_image = (target_image-target_mean)/target_std
+                max_var = np.max(input_image!=np.inf)
+                input_image = np.where(input_image==np.inf,max_var,input_image)
+                input_mean = np.mean(input_image,dtype=np.float64)
+                input_std = np.std(input_image,dtype=np.float64)
+                input_image = (input_image-input_mean)/input_std
 
         i=0
         j=0
         k=0
         prediction = np.zeros_like(target_image)
         d = np.zeros_like(target_image)+1e-4
-        o = 64
-        od=16
+        o = 32
+        od = 16
         # input_image = np.pad(input_image,((0,0),()))
         while i<=input_image.shape[0]-gv.patch_size[0]:
             while j<=input_image.shape[1]-gv.patch_size[1]:
@@ -277,9 +319,9 @@ elif (gv.model_type == "UNET"):
             i+=od
         prediction_cut = (prediction/(d))[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         # prediction_cut = (prediction_cut-np.mean(prediction_cut,dtype=np.float64))/np.std(prediction_cut,dtype=np.float64)
-        ImageUtils.imsave(input_image,"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(target_image,"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(prediction_cut,"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        ImageUtils.imsave(input_image.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        ImageUtils.imsave(target_image.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
         p=pearson_corr(target_image[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)], (prediction/(d))[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)])
         pcc+=p
         print("pearson corr for image:{} is :{}".format(image_index,p))

@@ -11,6 +11,12 @@ import sklearn as sklearn
 import cv2
 from patchify import patchify
 
+def normalize(image_ndarray,max_value=255,dtype=np.uint8) -> np.ndarray:
+    image_ndarray = image_ndarray.astype(np.float64)
+    max_var = np.max(image_ndarray!=np.inf)
+    image_ndarray = np.where(image_ndarray==np.inf,max_var,image_ndarray)
+    temp_image = image_ndarray-np.min(image_ndarray)
+    return ((temp_image)/((np.max(temp_image))*max_value)).astype(dtype)
 
 def slice_image(image_ndarray: np.ndarray, indexes: list) -> np.ndarray:
     n_dim = len(image_ndarray.shape)
@@ -65,7 +71,9 @@ class DataGen(keras.utils.Sequence):
                  pairs=False,
                  masking_pair = False,
                  cutoff = 0.0,
-                 neg_ratio=1):
+                 neg_ratio=1,
+                 norm_type="std",
+                 for_clf = False):
 
         self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(
             os.environ.get('SLURM_JOB_ID'))
@@ -102,6 +110,8 @@ class DataGen(keras.utils.Sequence):
         self.neg_ratio = neg_ratio
         self.masking_pair = masking_pair
         self.cutoff = cutoff
+        self.norm_type = norm_type
+        self.for_clf = for_clf
 
         self.dists = {}
         self.patches_from_image = patches_from_image
@@ -130,6 +140,8 @@ class DataGen(keras.utils.Sequence):
                     (self.buffer_size, *self.patch_size))
                 self.pred_buffer = np.zeros(
                     (self.buffer_size, *self.patch_size))
+            if self.for_clf:
+                self.labels_buffer = np.zeros((self.buffer_size, 1))
 
         if (not os.path.exists(self.new_path_origin)):
             os.makedirs(self.new_path_origin)
@@ -170,13 +182,14 @@ class DataGen(keras.utils.Sequence):
 
                 input_image, new_input_path = self.get_image_from_ssd(
                     image_path, self.input_col, k)
-                target_image, new_target_path = self.get_image_from_ssd(
-                    image_path, self.target_col, k)
+                if not self.for_clf:
+                    target_image, new_target_path = self.get_image_from_ssd(
+                        image_path, self.target_col, k)
                 if self.predictors is not None:
                     pred_image, new_prediction_path = self.get_image_from_ssd(
                         image_path, "prediction", k)
 
-                if (input_image is None or target_image is None):
+                if (input_image is None or (target_image is None and not self.for_clf)):
                     image_ndarray = ImageUtils.image_to_ndarray(
                         ImageUtils.imread(image_path))
                     image_ndarray = image_ndarray.astype(np.float64)
@@ -207,24 +220,29 @@ class DataGen(keras.utils.Sequence):
                         image_ndarray, channel_index)
                     if (self.mask):
                         input_image = mask_image_func(input_image, mask_image)
+                    if (self.for_clf):
+                        mask_index = int(self.df.get_item(image_index, 'structure_seg'))
+                        masked_input_image = ImageUtils.get_channel(image_ndarray, mask_index)      
                     if (self.norm):
-                        # input_image = ImageUtils.normalize(
-                        #     input_image, max_value=1.0, dtype=np.float16)
-                        mean = np.mean(input_image,dtype=np.float64)
-                        std = np.std(input_image,dtype=np.float64)
-                        if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
-                            # raise Exception("Error calculating mean or std")
-                            # print("Calculating mean and std again, input_image:{}".format(image_path))  
-                            max_var = np.max(input_image!=np.inf)
-                            input_image = np.where(input_image==np.inf,max_var,input_image)
+                        if self.norm_type == "std":
+                            # input_image = ImageUtils.normalize(
+                            #     input_image, max_value=1.0, dtype=np.float16)
                             mean = np.mean(input_image,dtype=np.float64)
                             std = np.std(input_image,dtype=np.float64)
-                        self.dists[new_input_path] = {"mean":mean,"std":std}
-                        # print("{} mean:{}, std:{}".format(new_input_path,mean,std))
-                        input_image = (input_image-mean)/std
-                        
+                            if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
+                                # raise Exception("Error calculating mean or std")
+                                # print("Calculating mean and std again, input_image:{}".format(image_path))  
+                                max_var = np.max(input_image!=np.inf)
+                                input_image = np.where(input_image==np.inf,max_var,input_image)
+                                mean = np.mean(input_image,dtype=np.float64)
+                                std = np.std(input_image,dtype=np.float64)
+                            self.dists[new_input_path] = {"mean":mean,"std":std}
+                            # print("{} mean:{}, std:{}".format(new_input_path,mean,std))
+                            input_image = (input_image-mean)/std
+                        else:
+                            input_image = normalize(input_image, max_value=1.0, dtype=np.float32)
 
-                    if (self.target_col == self.input_col):
+                    if (self.target_col == self.input_col or self.for_clf):
                         target_image = input_image
                     else:
                         channel_index = int(self.df.get_item(
@@ -235,20 +253,23 @@ class DataGen(keras.utils.Sequence):
                             target_image = mask_image_func(
                                 target_image, mask_image)
                         if (self.norm):
-                            # target_image = ImageUtils.normalize(
-                            #     target_image, max_value=1.0, dtype=np.float16)
-                            mean = np.mean(target_image,dtype=np.float64)
-                            std = np.std(target_image,dtype=np.float64)
-                            if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
-                                # raise Exception("Error calculating mean or std")  
-                                # print("Calculating mean and std again, target_image:{}".format(image_path))   
-                                max_var = np.max(target_image!=np.inf)
-                                target_image = np.where(target_image==np.inf,max_var,target_image)
+                            if self.norm_type == "std":
+                                # target_image = ImageUtils.normalize(
+                                #     target_image, max_value=1.0, dtype=np.float16)
                                 mean = np.mean(target_image,dtype=np.float64)
-                                std = np.std(target_image,dtype=np.float64)                        
-                            self.dists[new_target_path] = {"mean":mean,"std":std}
-                            # print("{} mean:{}, std:{}".format(new_target_path,mean,std))
-                            target_image = (target_image-mean)/std
+                                std = np.std(target_image,dtype=np.float64)
+                                if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
+                                    # raise Exception("Error calculating mean or std")  
+                                    # print("Calculating mean and std again, target_image:{}".format(image_path))   
+                                    max_var = np.max(target_image!=np.inf)
+                                    target_image = np.where(target_image==np.inf,max_var,target_image)
+                                    mean = np.mean(target_image,dtype=np.float64)
+                                    std = np.std(target_image,dtype=np.float64)                        
+                                self.dists[new_target_path] = {"mean":mean,"std":std}
+                                # print("{} mean:{}, std:{}".format(new_target_path,mean,std))
+                                target_image = (target_image-mean)/std
+                            else:
+                                target_image = normalize(target_image, max_value=1.0, dtype=np.float32)
                     if (self.noise):
                         target_image += np.random.normal(0,
                                                         0.05, size=target_image.shape)
@@ -256,7 +277,8 @@ class DataGen(keras.utils.Sequence):
                     input_image = np.expand_dims(input_image[0], axis=-1)
                     target_image = np.expand_dims(target_image[0], axis=-1)
                     ImageUtils.imsave(input_image, new_input_path)
-                    ImageUtils.imsave(target_image, new_target_path)
+                    if not self.for_clf:
+                        ImageUtils.imsave(target_image, new_target_path)
 
                 if self.pairs:
                     input_image = ImageUtils.to_shape(input_image, self.patch_size)
@@ -317,6 +339,12 @@ class DataGen(keras.utils.Sequence):
                             pos = i*(self.batch_size*self.patches_from_image)+j*(self.patches_from_image)+k
                             self.input_buffer[pos] = input_patch
                             self.target_buffer[pos] = target_patch
+                            if self.for_clf:
+                                masked_input_patch = slice_image(masked_input_image, [*patch_indexes, (None, None)])                                
+                                label = 12
+                                if np.sum(masked_input_patch/255.) > 1:
+                                    label = self.df.get_item(image_index, 'label')
+                                self.labels_buffer[pos] = label
                     else:
                         if (self.resize):
                             # Resize to patch size
@@ -341,19 +369,39 @@ class DataGen(keras.utils.Sequence):
                                 target_image, self.patch_size)
                             if self.predictors is not None:
                                 if pred_image is None and self.predictors is not None:
-                                    organelle = image_path.split('/')[-1]
-                                    organelle = organelle.split("_")[0]
-                                    pred_image = self.predictors[organelle](
-                                        np.expand_dims(input_image, axis=0)).numpy()
-                                    ImageUtils.imsave(
-                                        pred_image, new_prediction_path)
-                                    self.pred_buffer[i*self.batch_size+j *
-                                                    self.patches_from_image] = pred_image
+                                    if isinstance(self.predictors,dict):
+                                        organelle = image_path.split('/')[-1]
+                                        organelle = organelle.split("_")[0]
+                                        pred_image = self.predictors[organelle](np.expand_dims(input_image, axis=0)).numpy()
+
+                                    else:
+                                        channel_index = int(self.df.get_item(image_index, "channel_dna"))
+                                        pred_image = ImageUtils.get_channel(image_ndarray, channel_index)
+                                    if (self.norm):
+                                        if self.norm_type == "std":
+                                            mean = np.mean(pred_image,dtype=np.float64)
+                                            std = np.std(pred_image,dtype=np.float64)
+                                            if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
+                                                # raise Exception("Error calculating mean or std")  
+                                                # print("Calculating mean and std again, target_image:{}".format(image_path))   
+                                                max_var = np.max(pred_image!=np.inf)
+                                                pred_image = np.where(pred_image==np.inf,max_var,pred_image)
+                                                mean = np.mean(pred_image,dtype=np.float64)
+                                                std = np.std(pred_image,dtype=np.float64)                        
+                                            pred_image = (pred_image-mean)/std
+                                            pred_image = np.expand_dims(pred_image[0], axis=-1)
+                                        else:
+                                            pred_image = normalize(pred_image, max_value=1.0, dtype=np.float32)                                    
+                                    ImageUtils.imsave(pred_image, new_prediction_path)
+                                    self.pred_buffer[i*self.batch_size+j *self.patches_from_image] = pred_image
 
                         self.input_buffer[i*self.batch_size+j *
                                         self.patches_from_image] = input_image
                         self.target_buffer[i*self.batch_size+j *
                                         self.patches_from_image] = target_image
+                        if self.for_clf:
+                            label = self.df.get_item(image_index, 'label')
+                            self.labels_buffer[i*self.batch_size+j * self.patches_from_image] = label
                 j+=1
             except:
                 print("could not load image {} , trying another one.\n".format(image_index))
@@ -364,7 +412,7 @@ class DataGen(keras.utils.Sequence):
 
     def fill_buffer(self):
         threads = []
-        num_threads = 8
+        num_threads = 16
         for i in tqdm(range(self.num_batches)):
             if (num_threads > 1):
                 thread = threading.Thread(target=self.fill_samples, args=[i])
@@ -409,6 +457,9 @@ class DataGen(keras.utils.Sequence):
             L = self.labels_buffer[index*num_samples:(index+1)*num_samples]
             X = [X,Y]
             Y = L
+        if self.for_clf:
+            X = X
+            Y = self.labels_buffer[index*num_samples:(index+1)*num_samples]
         return X, Y
 
     def __len__(self):

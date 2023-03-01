@@ -31,9 +31,11 @@ tf.compat.v1.enable_eager_execution()
     #     return {'l1': self.l1,'kernel':self.kernel,'blob':self.blob,'l2':self.l2}
 
 class MaskGenerator(keras.Model):
-    def __init__(self, patch_size, adaptor, unet, **kwargs):
+    def __init__(self, patch_size, adaptor, unet, weighted_pcc,pcc_target=0.9, **kwargs):
         super(MaskGenerator, self).__init__(**kwargs)
 
+        self.weighted_pcc = weighted_pcc
+        self.pcc_target = pcc_target
         self.unet = unet
         
         image_input = keras.layers.Input(shape=patch_size,dtype=tf.float16)
@@ -167,10 +169,13 @@ class MaskGenerator(keras.Model):
             #    ),axis=(0,1)
             # )
             
-            pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,0.97)
+            if self.weighted_pcc:
+                pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions,data_1)),-1.0,self.pcc_target)
+            else:
+                pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
             # inv_pcc_loss = tf.math.abs(tf_pearson_corr(unet_target,inv_unet_predictions))
             
-            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (0.97-pcc_loss)*5000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*5000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
             
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
@@ -182,7 +187,7 @@ class MaskGenerator(keras.Model):
         self.pcc.update_state(pcc_loss)
         self.total_loss_tracker.update_state(total_loss)
         # self.mask_size.update_state(inv_pcc_loss)
-        self.stop.update_state(0.97-pcc_loss + mean_mask)
+        self.stop.update_state(self.pcc_target-pcc_loss + mean_mask)
         
                
         return {

@@ -62,7 +62,7 @@ class DataGen(keras.utils.Sequence):
                  mask_col='membrane_seg',
                  norm=True,
                  dilate=False,
-                 dilate_kernel=np.ones((7, 7), np.uint8),
+                 dilate_kernel=np.ones((17, 17), np.uint8),
                  noise=False,
                  resize=True,
                  augment=False,
@@ -211,8 +211,8 @@ class DataGen(keras.utils.Sequence):
                             image_ndarray, mask_index)
                         if (self.dilate):
                             for h in range(mask_image.shape[0]):
-                                cv2.dilate(mask_image[0, h, :, :].astype(
-                                    np.uint8), self.dilate_kernel, mask_image[0, h, :, :].astype(np.uint8))
+                                mask_image[0, h, :, :] = cv2.dilate(mask_image[0, h, :, :].astype(
+                                    np.uint8), self.dilate_kernel)
 
                     channel_index = int(self.df.get_item(
                         image_index, self.input_col))
@@ -252,24 +252,29 @@ class DataGen(keras.utils.Sequence):
                         if (self.mask):
                             target_image = mask_image_func(
                                 target_image, mask_image)
-                        if (self.norm):
-                            if self.norm_type == "std":
-                                # target_image = ImageUtils.normalize(
-                                #     target_image, max_value=1.0, dtype=np.float16)
-                                mean = np.mean(target_image,dtype=np.float64)
-                                std = np.std(target_image,dtype=np.float64)
-                                if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
-                                    # raise Exception("Error calculating mean or std")  
-                                    # print("Calculating mean and std again, target_image:{}".format(image_path))   
-                                    max_var = np.max(target_image!=np.inf)
-                                    target_image = np.where(target_image==np.inf,max_var,target_image)
+                        if (self.dilate):
+                            for h in range(target_image.shape[1]):
+                                target_image[0, h, :, :] = cv2.dilate(target_image[0, h, :, :].astype(
+                                    np.uint8), self.dilate_kernel)                            
+                        else:
+                            if (self.norm):
+                                if self.norm_type == "std":
+                                    # target_image = ImageUtils.normalize(
+                                    #     target_image, max_value=1.0, dtype=np.float16)
                                     mean = np.mean(target_image,dtype=np.float64)
-                                    std = np.std(target_image,dtype=np.float64)                        
-                                self.dists[new_target_path] = {"mean":mean,"std":std}
-                                # print("{} mean:{}, std:{}".format(new_target_path,mean,std))
-                                target_image = (target_image-mean)/std
-                            else:
-                                target_image = normalize(target_image, max_value=1.0, dtype=np.float32)
+                                    std = np.std(target_image,dtype=np.float64)
+                                    if (np.isnan(mean) or np.isnan(std) or np.isinf(mean) or np.isinf(std)):
+                                        # raise Exception("Error calculating mean or std")  
+                                        # print("Calculating mean and std again, target_image:{}".format(image_path))   
+                                        max_var = np.max(target_image!=np.inf)
+                                        target_image = np.where(target_image==np.inf,max_var,target_image)
+                                        mean = np.mean(target_image,dtype=np.float64)
+                                        std = np.std(target_image,dtype=np.float64)                        
+                                    self.dists[new_target_path] = {"mean":mean,"std":std}
+                                    # print("{} mean:{}, std:{}".format(new_target_path,mean,std))
+                                    target_image = (target_image-mean)/std
+                                else:
+                                    target_image = normalize(target_image, max_value=1.0, dtype=np.float32)
                     if (self.noise):
                         target_image += np.random.normal(0,
                                                         0.05, size=target_image.shape)
@@ -412,7 +417,7 @@ class DataGen(keras.utils.Sequence):
 
     def fill_buffer(self):
         threads = []
-        num_threads = 16
+        num_threads = 4
         for i in tqdm(range(self.num_batches)):
             if (num_threads > 1):
                 thread = threading.Thread(target=self.fill_samples, args=[i])

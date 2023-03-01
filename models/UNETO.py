@@ -139,7 +139,7 @@ class UNET(keras.Model):
     
     def call(self,input):
         if len(input)>1:
-            prediction = self.unet(tf.concat(input,axis=-1))
+            prediction = self.unet(tf.concat([input[0],input[1]],axis=-1))
         else:
             prediction = self.unet(input)
         return prediction

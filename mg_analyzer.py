@@ -23,8 +23,8 @@ gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
-gv.mg_model_path = "mg_model_ne_10_06_22_5_0_new"
-gv.organelle = "Nuclear-envelope" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
+gv.mg_model_path = "mg_model_membrane_10_06_22_5_0_new"
+gv.organelle = "Plasma-membrane" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
 #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)","Actin-filaments"
 gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
 
@@ -38,13 +38,13 @@ else:
 dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
 
 ## Choose images
-images = [4] #range(0,5,1) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0]) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0])
+images = [7]#range(5,9,1) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0]) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0])
 
 ## Noise
 noise_scale = 5.0
 
 ## Batch size
-batch_size=4
+batch_size=1
 
 ## Image center
 center_xy = [312,462] #[200,100]
@@ -174,9 +174,9 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
     elif mode=="loo":
         pred_path = "predictions_loo"
     elif mode=="mask":
-        pred_path = "predictions_masked"  
-        ths = [0.0]
-        # ths=[0.0,0.0001,0.0002,0.0005,0.0008,0.001]
+        pred_path = "predictions_masked/gc"  
+        # ths = [0.0]
+        ths=[0.0,0.000075,0.0001,0.0002,0.0005,0.0008,0.001]
     elif mode=="regular":
         pred_path="predictions"
         ths=[manual_th]
@@ -267,15 +267,18 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
             if save_image:
                 create_dir_if_not_exist("{}/{}/{}".format(dir_path,image_index,th))
             if mode=="mask" and mask_image is not None:
+                # mask_image_ndarray = target_seg_image
+                
                 mask_image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(mask_image))/255.
                 mask_image_ndarray = np.expand_dims(mask_image_ndarray[0],axis=-1)
-                # mask_image_ndarray = slice_image(mask_image_ndarray,slice_by)
-                # mask_p = (1. - mask_image_ndarray*0.25)
-                mask_p = tf.cast(tf.where(mask_image_ndarray>th,0.0,1.0),tf.float64).numpy()
-                mask_p_binary = tf.cast(tf.where(mask_image_ndarray>th,0.0,1.0),tf.float64).numpy()
+                mask_image_ndarray = slice_image(mask_image_ndarray,slice_by)
+                
+                ## mask_p = (1. - mask_image_ndarray*0.25)
+                mask_p = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
+                mask_p_binary = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
             elif mode=="agg":
                 mask_p_binary = tf.cast(tf.where(mask_p_full/d>th,1.0,0.0),tf.float64).numpy()
-                mask_p = tf.cast(tf.where(mask_p_full/d>th,1.0,0.0),tf.float64).numpy()
+                mask_p = tf.cast(tf.where(mask_p_full/d>th,1.0,0.5),tf.float64).numpy()
             elif mode=="loo":
                 ## 1.0 no noise, 0.0 is noise
                 mask_p_binary = tf.cast(tf.where(tf.math.logical_and(mask_p_full/d>(th-ths_step),mask_p_full/d<=th),1.0,0.0),tf.float64).numpy()
@@ -283,9 +286,10 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
             else:
                 if manual_th != "full":
                     mask_p_binary = tf.cast(tf.where(mask_p_full/d>th,1.0,0.0),tf.float64).numpy()
+                    mask_p = tf.cast(tf.where(mask_p_full/d>th,1.0,0.0),tf.float64).numpy()
                 else:
                     mask_p_binary = np.ones_like(mask_p_full)
-                mask_p = mask_p_full/d
+                    mask_p = mask_p_full/d
             mask_size = np.sum(mask_p_binary,dtype=np.float64)
             mask_organelle_intersection = np.sum(mask_p_binary*target_seg_image,dtype=np.float64)/mask_size
             mask_size = mask_size/np.prod(mask_p_binary.shape)
@@ -693,14 +697,16 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
         corr_results.create()
         
 # analyze_correlations(save_images=3, mask_th=0.7, organelle_precent_pixels=0.5, organelles=["Plasma-membrane","Nuclear-envelope","Endoplasmic-reticulum","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes","Golgi"])
-# analyze_correlations_constant(save_images=3, mask_th=0.65, absoulte_organelle_precent_pixels=0.01, organelles=["Golgi","Plasma-membrane","Nuclear-envelope","Endoplasmic-reticulum","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes"])
+# analyze_correlations_constant(save_images=3, mask_th=0.8, absoulte_organelle_precent_pixels=0.01, organelles=["Golgi","Plasma-membrane","Nuclear-envelope","Endoplasmic-reticulum","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes"])
+# analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Lysosome","Adherens-junctions","Gap-junctions","Matrix-adhesions","Peroxisomes","Endosomes"])
+# analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Microtubules"])
 
 # analyze_th("regular",save_histo=False,save_image=True)
 # analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=True,save_histo=False)
-# for mth in [0.75,0.8,0.85,0.9,0.95]:
-    # analyze_th("regular",manual_th=mth)
-# analyze_th("mask","{}/masks/saliency_full.tiff".format(gv.mg_model_path)) #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
-analyze_th("mask","{}/predictions_masked/4/MASK_2.tif".format(gv.mg_model_path))
+# for mth in [0.85]:
+    # analyze_th("regular",mask_image=None,manual_th=mth,save_image=True,save_histo=False)
+analyze_th("mask","{}/X_gradcam_layer_downsample_4_full.tiff".format(gv.mg_model_path)) #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
+# analyze_th("mask","{}/predictions_agg/1/MASK_4.tif".format(gv.mg_model_path))
 # analyze_th("mask","{}/predictions_masked/4/MASK_2.tif".format(gv.mg_model_path))
 # analyze_th("agg")
 # analyze_th("loo")

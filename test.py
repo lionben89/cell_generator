@@ -15,12 +15,28 @@ from sklearn.neighbors import KernelDensity
 
 tf.compat.v1.enable_eager_execution()
 
+path = "/sise/assafzar-group/assafzar/GVTNets_data/lamin_b1_model/"
 
-gv.model_type = "CLF"
+import tensorflow.compat.v1 as tf1
+
+def load_tf1(path, input):
+    print('Loading from', path)
+    with tf.Graph().as_default() as g:
+        with tf1.Session() as sess:
+            meta_graph = tf1.saved_model.load(sess, ["serve"], path)
+            sig_def = meta_graph.signature_def[tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY]
+            input_name = sig_def.inputs['input'].name
+            output_name = sig_def.outputs['output'].name
+            print('  Output with input', input, ': ', 
+                sess.run(output_name, feed_dict={input_name: input}))
+
+load_tf1(path, np.zeros((32,64,64)))
+gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
-gv.unet_model_path = "./unet_model_22_05_22_actin_128p_save_bs4-1"
+predictors=False #True w_dna
+gv.unet_model_path = "unet_model_22_05_22_membrane_w_dna_32f" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Actin-filaments" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Plasma-membrane" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -30,7 +46,7 @@ if gv.model_type == "CLF":
 else:
     gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
     gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
-norm_type = "minmax" #"minmax"#"std"#
+norm_type = "std" #"minmax"#"std"#
 gv.patch_size = (32,128,128,1)
 
 compound = None #"rapamycin" #"paclitaxol" #"blebbistatin" #None #"staurosporine"
@@ -62,7 +78,7 @@ def normalize(image_ndarray,max_value=255,dtype=np.uint8) -> np.ndarray:
     temp_image = image_ndarray-np.min(image_ndarray)
     return ((temp_image)/((np.max(temp_image))*max_value)).astype(dtype)
 
-test_dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False, norm_type=norm_type)
+test_dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False, norm_type=norm_type,predictors=predictors)
 # test_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.9, augment=False)
 
 def euclidean_distance(x,y):
@@ -271,7 +287,9 @@ elif (gv.model_type == "UNET"):
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col,0)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col,0)
-        if (input_image is None or target_image is None):
+        pred_image, prediction_new_file_path = test_dataset.get_image_from_ssd(image_path, "prediction", 0)
+        
+        if (input_image is None or target_image is None or pred_image is None):
 
             image_ndarray = None
             image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(image_path))
@@ -279,36 +297,54 @@ elif (gv.model_type == "UNET"):
             input_image = ImageUtils.get_channel(image_ndarray,channel_index)
             channel_index = int(test_dataset.df.get_item(image_index,test_dataset.target_col))
             target_image = ImageUtils.get_channel(image_ndarray,channel_index)
+            channel_index = int(test_dataset.df.get_item(image_index, "channel_dna"))
+            pred_image = ImageUtils.get_channel(image_ndarray, channel_index)
+            
             input_image = np.expand_dims(input_image[0], axis=-1)
             target_image = np.expand_dims(target_image[0], axis=-1)
+            pred_image = np.expand_dims(pred_image[0], axis=-1)
+            
             if norm_type == "minmax":
                 target_image = normalize(target_image,max_value=1.0,dtype=np.float32)
                 input_image = normalize(input_image,max_value=1.0,dtype=np.float32)
+                pred_image = normalize(pred_image,max_value=1.0,dtype=np.float32)
             else:
                 target_mean = np.mean(target_image,dtype=np.float64)
                 target_std = np.std(target_image,dtype=np.float64)
                 target_image = (target_image-target_mean)/target_std
+                
                 max_var = np.max(input_image!=np.inf)
                 input_image = np.where(input_image==np.inf,max_var,input_image)
                 input_mean = np.mean(input_image,dtype=np.float64)
                 input_std = np.std(input_image,dtype=np.float64)
                 input_image = (input_image-input_mean)/input_std
-
+                
+                pred_mean = np.mean(pred_image,dtype=np.float64)
+                pred_std = np.std(pred_image,dtype=np.float64)
+                pred_image = (pred_image-pred_mean)/pred_std
+        
         i=0
         j=0
         k=0
         prediction = np.zeros_like(target_image)
         d = np.zeros_like(target_image)+1e-4
-        o = 32
-        od = 16
+        o = 32 #overlap in xy dim
+        od = 16 #overlap in z dim
         # input_image = np.pad(input_image,((0,0),()))
         while i<=input_image.shape[0]-gv.patch_size[0]:
             while j<=input_image.shape[1]-gv.patch_size[1]:
                 while k<=input_image.shape[2]-gv.patch_size[2]:
                     s = [(i,i+gv.patch_size[0]),(j,j+gv.patch_size[1]),(k,k+gv.patch_size[2])]
                     patch = slice_image(input_image,s)
+                    pred_patch = slice_image(pred_image,s)
                     patch = ImageUtils.to_shape(patch,gv.patch_size,min_shape=gv.patch_size)
-                    patch_p = unet(np.expand_dims(patch,axis=0))
+                    if predictors:
+                        pred_patch = ImageUtils.to_shape(pred_patch,gv.patch_size,min_shape=gv.patch_size)
+                        
+                        # patch_p = unet(np.expand_dims([patch],axis=0))
+                        patch_p = unet.unet(np.expand_dims(np.concatenate([patch,pred_patch],axis=-1),axis=0))
+                    else:
+                        patch_p = unet(np.expand_dims(patch,axis=0))
                     weights = _get_weights(patch_p.shape)
                     prediction[i:i+gv.patch_size[0],j:j+gv.patch_size[1],k:k+gv.patch_size[2]] += patch_p*weights #((std*patch_p)+mean)/1000
                     d[i:i+gv.patch_size[0],j:j+gv.patch_size[1],k:k+gv.patch_size[2]] += weights[0]

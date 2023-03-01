@@ -17,7 +17,7 @@ def get_unet(input_size,name="unet"):
             convt_layer = keras.layers.Conv2DTranspose
         
         layer_dim = np.array(input_size[:-1],dtype=np.int32)
-        filters = 16
+        filters = 32
         
         input = keras.Input(shape=input_size)
         skip_connection = []

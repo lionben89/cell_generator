@@ -129,5 +129,4 @@ dmypy.json
 .pyre/
 .history/*
 *.csv
-*.sh
 *.out

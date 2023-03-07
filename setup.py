@@ -20,11 +20,12 @@ requirements = [
     "multipledispatch",
     "cell_imaging_utils",
     "tqdm",
-    "sklearn",
+    "scikit-learn",
     "opencv-python",
     "scipy",
     "seaborn",
-    "patchify"
+    "patchify",
+    "tensorflow-addons"
 ]
 
 

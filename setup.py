@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 requirements = [
     "matplotlib",
-    "numpy====1.20.3",
+    "numpy==1.20.3",
     "tifffile",
     "scikit-image>=0.15.0",
     "aicsimageio==3.0.7",

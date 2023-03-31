@@ -13,7 +13,7 @@
 #SBATCH --tasks=1 # 4 processes – use for multiprocessing
 ### Start you code below ####
 module load anaconda              ### load anaconda module
-source activate cell_generator         ### activating environment, environment must be configured before running the job
+source activate cell_generator_new         ### activating environment, environment must be configured before running the job
 ###source activate fnet_v1         ### activating environment, environment must be configured before running the job
 # export STORAGE_DIR=/storage/users/assafzar/single_cells_fovs
 # export SLURM_SCRATCH_DIR=/scratch/lionb@auth.ad.bgu.ac.il/${SLURM_JOB_ID}/single_cells_fovs

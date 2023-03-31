@@ -62,7 +62,7 @@ class DataGen(keras.utils.Sequence):
                  mask_col='membrane_seg',
                  norm=True,
                  dilate=False,
-                 dilate_kernel=np.ones((17, 17), np.uint8),
+                 dilate_kernel=np.ones((25, 25), np.uint8),
                  noise=False,
                  resize=True,
                  augment=False,

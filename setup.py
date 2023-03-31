@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 requirements = [
     "matplotlib",
-    "numpy",
+    "numpy==1.20.3",
     "tifffile",
     "scikit-image>=0.15.0",
     "aicsimageio==3.0.7",
@@ -16,7 +16,7 @@ requirements = [
     "twine",
     "setuptools>=42",
     "wheel",
-    "pandas",
+    "pandas==1.5.3",
     "multipledispatch",
     "cell_imaging_utils",
     "tqdm",

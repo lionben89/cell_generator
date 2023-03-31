@@ -1,6 +1,6 @@
 from copy import deepcopy
 import cv2
-from numpy import dtype
+import numpy as np
 import scipy
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -10,31 +10,15 @@ from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 import os
 from skimage.filters import threshold_li
-from patchify import unpatchify,patchify
-from sklearn.neighbors import KernelDensity
+# from patchify import unpatchify,patchify
+# from sklearn.neighbors import KernelDensity
 
-tf.compat.v1.enable_eager_execution()
+# tf.compat.v1.enable_eager_execution()
 
-path = "/sise/assafzar-group/assafzar/GVTNets_data/lamin_b1_model/"
-
-import tensorflow.compat.v1 as tf1
-
-def load_tf1(path, input):
-    print('Loading from', path)
-    with tf.Graph().as_default() as g:
-        with tf1.Session() as sess:
-            meta_graph = tf1.saved_model.load(sess, ["serve"], path)
-            sig_def = meta_graph.signature_def[tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY]
-            input_name = sig_def.inputs['input'].name
-            output_name = sig_def.outputs['output'].name
-            print('  Output with input', input, ': ', 
-                sess.run(output_name, feed_dict={input_name: input}))
-
-load_tf1(path, np.zeros((32,64,64)))
 gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
-predictors=False #True w_dna
-gv.unet_model_path = "unet_model_22_05_22_membrane_w_dna_32f" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
+predictors=True #True w_dna
+gv.unet_model_path = "./unet_model_22_05_22_membrane_48_64_64_w_dna"#"unet_model_22_05_22_actin_128" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
 gv.clf_model_path = "./clf_model_14_12_22-1"
 gv.organelle = "Plasma-membrane" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
@@ -47,13 +31,14 @@ else:
     gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
     gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
 norm_type = "std" #"minmax"#"std"#
-gv.patch_size = (32,128,128,1)
+gv.patch_size = (48,64,64,1)
+# gv.patch_size = (32,128,128,1)
 
 compound = None #"rapamycin" #"paclitaxol" #"blebbistatin" #None #"staurosporine"
 if compound is not None:
     ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
 else:
-    ds_path = gv.test_ds_path
+    ds_path = gv.train_ds_path
     
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
@@ -246,41 +231,13 @@ elif (gv.model_type == "CLF"):
         clf.evaluate(dataset)
         
 elif (gv.model_type == "UNET"):
+    images = [0]
+    # images = range(test_dataset.df.get_shape()[0])
     unet = keras.models.load_model(gv.unet_model_path)
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
         os.makedirs("{}/predictions".format(gv.unet_model_path))
-    # n = test_dataset.__len__()
-    # ppc = 0
-    # out = 0
-    # for j in range(n):
-    #     patchs = test_dataset.__getitem__(j)[0]
-    #     target_patchs = test_dataset.__getitem__(j)[1]
-    #     prediction = unet(patchs).numpy()
-    #     # pm_target = unet.pm(test_dataset.__getitem__(j)[0]).numpy()
-    #     # pm_pred =  unet.pm([patchs,prediction]).numpy()
-    #     # prediction = unet(patchs).numpy()
-        
-    #     for i in range(patchs.shape[0]):
-    #         k = j*patchs.shape[0] + i
-    #         if k < 24:
-    #             ImageUtils.imsave(
-    #                 patchs[i], "{}/predictions/input_patch_{}.tiff".format(gv.unet_model_path, k))
-    #             ImageUtils.imsave(
-    #                 target_patchs[i], "{}/predictions/target_patch_{}.tiff".format(gv.unet_model_path, k))
-    #             ImageUtils.imsave(
-    #                 prediction[i], "{}/predictions/prediction_patch_{}.tiff".format(gv.unet_model_path, k))
-    #         p = pearson_corr(target_patchs[i], (prediction[i]))
-            
-    #         if (p>0.0):
-    #            ppc += p 
-    #         else:
-    #            out+=1
-    #         # print("pearson_corr correlation for image {}: {}, t:{}, p:{}".format(k, p, pm_target[i],pm_pred[i]))
-    #         print("pearson_corr correlation for image {}: {}".format(k, p))
-    # print("avg pearson_corr correlation: {}".format(
-    #     ppc/((patchs.shape[0]*n)-out)))
     pcc = 0
-    for image_index in range(test_dataset.df.get_shape()[0]):
+    for image_index in images:        
         # image_index = 1
         if (not os.path.exists("{}/predictions/{}".format(gv.unet_model_path,image_index))):
             os.makedirs("{}/predictions/{}".format(gv.unet_model_path,image_index))
@@ -354,16 +311,49 @@ elif (gv.model_type == "UNET"):
             j=0
             i+=od
         prediction_cut = (prediction/(d))[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
-        # prediction_cut = (prediction_cut-np.mean(prediction_cut,dtype=np.float64))/np.std(prediction_cut,dtype=np.float64)
-        ImageUtils.imsave(input_image.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(target_image.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        target_cut = (target_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
+        input_cut = (input_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
+        
+        ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
         ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        p=pearson_corr(target_image[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)], (prediction/(d))[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)])
+        p=pearson_corr(target_cut, prediction_cut)
         pcc+=p
         print("pearson corr for image:{} is :{}".format(image_index,p))
+        
+        i=0
+        j=0
+        k=0
+        # o = 16 #overlap in xy dim
+        # od = 1 #overlap in z dim
+        # patch_size = (16,32,32,1)
+        o = 16 #overlap in xy dim
+        od = 1 #overlap in z dim
+        patch_size = (32,32,32,1)
+        pearson_hm = np.zeros_like(prediction_cut)
+        d = np.zeros_like(target_image)+1e-4
+        weights = _get_weights(patch_size)
+        while i<=prediction_cut.shape[0]-patch_size[0]:
+            while j<=prediction_cut.shape[1]-patch_size[1]:
+                while k<=prediction_cut.shape[2]-patch_size[2]:
+                    s = [(i,i+patch_size[0]),(j,j+patch_size[1]),(k,k+patch_size[2])]
+                    target_patch = slice_image(target_cut,s)
+                    pred_patch = slice_image(prediction_cut,s)
+                    patch = ImageUtils.to_shape(target_patch,patch_size,min_shape=patch_size)
+                    pred_patch = ImageUtils.to_shape(prediction_cut,patch_size,min_shape=patch_size)
+                    p=pearson_corr(patch,pred_patch)
+                    d[i:i+patch_size[0],j:j+patch_size[1],k:k+patch_size[2]] += weights[0]
+                    pearson_hm[i:i+patch_size[0],j:j+patch_size[1],k:k+patch_size[2]] +=p*weights[0]
+                    k+=o
+                k=0
+                j+=o
+            j=0
+            i+=od 
+        d_cut = (d)[:prediction_cut.shape[0],:prediction_cut.shape[1],:prediction_cut.shape[2]]  
+        ImageUtils.imsave((pearson_hm/d_cut).astype(np.float16),"{}/predictions/{}/pearson_hm_{}.tiff".format(gv.unet_model_path,image_index,image_index))     
         print("prediction - mean:{}, std:{}".format(np.mean(prediction_cut,dtype=np.float64),np.std(prediction_cut,dtype=np.float64)))
-        print("target - mean:{}, std:{}".format(np.mean(target_image,dtype=np.float64),np.std(target_image,dtype=np.float64)))
-    print("average pcc:{}".format(pcc/(test_dataset.df.get_shape()[0])))
+        print("target - mean:{}, std:{}".format(np.mean(target_image,dtype=np.float64),np.std(target_image,dtype=np.float64)))        
+    print("average pcc:{}".format(pcc/len(images)))
     
 elif (gv.model_type == "SG"):
     from models.SampleGenerator import *

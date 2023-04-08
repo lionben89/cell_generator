@@ -25,12 +25,12 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 # gv.mg_model_path = "./mg_model_ne_10_06_22_5_0_new_weighted_pcc_1000"
-gv.mg_model_path = "./mg_model_mito_10_06_22_5_0_new"
-gv.organelle = "Mitochondria" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
+gv.mg_model_path = "./mg_model_actin_10_06_22_5_0_new"
+gv.organelle = "Actin-filaments" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
 #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)","Actin-filaments"
 gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
 
-compound = None #"staurosporine"#"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
+compound = "paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
 if compound is not None:
     ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
 else:
@@ -44,7 +44,7 @@ weighted_pcc = False
 dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
 
 ## Choose images
-images = range(10,20,1)#[0,1,2,3,4,5]#range(5,9,1) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0]) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0])
+images = range(10) #range(10,20,1)#[0,1,2,3,4,5]#range(5,9,1) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0]) #list(np.random.randint(0,dataset.df.get_shape()[0],30,dtype=int))#range(dataset.df.get_shape()[0])
 
 ## Noise
 noise_scale = 5.0
@@ -118,24 +118,7 @@ def collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,image):
             px+=min(xy_step,max(1,px_end-gv.patch_size[1]-px))
         px=px_start
         pz+=min(z_step,max(1,pz_end-gv.patch_size[0]-pz))
-        
-    # if pz+z_step < pz_end:
-        # pz = pz_end - gv.patch_size[0]
-        # while px<=px_end-gv.patch_size[1]:
-        #     while py<=py_end-gv.patch_size[2]: 
-                
-        #         ## Slice patch from input       
-        #         px_start_patch = px-px_start
-        #         py_start_patch = py-py_start    
-        #         s = [(pz,pz+gv.patch_size[0]),(px_start_patch,px_start_patch+gv.patch_size[1]),(py_start_patch,py_start_patch+gv.patch_size[2])]
-        #         patch = slice_image(image,s)
-        #         # seg_patch = slice_image(target_seg_image,s)
-                
-        #         patchs.append(patch)
-                
-        #         py+=xy_step
-        #     py=py_start  
-        #     px+=xy_step
+    
     return np.array(patchs)
 
 def assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,patchs,weights,assembled_image_shape):
@@ -169,7 +152,7 @@ def assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,patchs,weight
 
 def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False):
     ## Create thresholds
-    num_bins = 100
+    num_bins = 10
     ths_start = 0.4
     ths_step = 0.05
     ths_stop = 1.05
@@ -180,9 +163,9 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
     elif mode=="loo":
         pred_path = "predictions_loo"
     elif mode=="mask":
-        pred_path = "predictions_masked/bp"  
+        pred_path = "predictions_masked/gc"  
         # ths = [0.0]
-        ths=[0.0,0.0000125,0.000025,0.00005,0.000075,0.0001,0.00015,0.0002,0.0005,0.001]
+        ths=[0.0,0.0000125,0.000025,0.00005,0.000075,0.0001,0.00015,0.0002,0.00025,0.0003,0.0004,0.008]
     elif mode=="regular":
         pred_path="predictions"
         ths=[manual_th]
@@ -349,7 +332,7 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
         mask_results.add_row(mask_sizes)
         context_results.add_row(context)
         if save_histo:
-            h, _ = np.histogram((mask_p).reshape(1,-1), bins=num_bins, density=True,range=(0.01,1.01)) #ignore 0.0 for single cells
+            h, _ = np.histogram((mask_p).reshape(1,-1), bins=num_bins, density=True) #ignore 0.0 for single cells
             sum_histos += h
             histos.add_row(h)
             histos_axs[count // histos_l, count % histos_l].plot(bins,h)
@@ -713,11 +696,11 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
 # analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Lysosome","Adherens-junctions","Gap-junctions","Matrix-adhesions","Peroxisomes","Endosomes"])
 # analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Microtubules"])
 
-analyze_th("regular",save_histo=False,save_image=True,weighted_pcc=weighted_pcc)
-# analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc=weighted_pcc)
+analyze_th("regular",save_histo=True,save_image=True,weighted_pcc=weighted_pcc)
+# analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=False,save_histo=False,weighted_pcc=weighted_pcc)
 # for mth in [0.85]:
     # analyze_th("regular",mask_image=None,manual_th=mth,save_image=True,save_histo=False)
-# analyze_th("mask","{}/saliency_full.tiff".format(gv.mg_model_path)) #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
+# analyze_th("mask","{}/X_gradcam_layer_downsample_4_full.tiff".format(gv.mg_model_path)) #gbp_full.tiff #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
 # analyze_th("mask","{}/predictions_agg/1/MASK_4.tif".format(gv.mg_model_path))
 # analyze_th("mask","{}/predictions_masked/4/MASK_2.tif".format(gv.mg_model_path))
 # analyze_th("agg")

@@ -44,9 +44,12 @@ def pearson_corr(a,b,weights=None):
         t_weights = [1.0,0.0]
         t = [ind,non_ind]
         for i in range(2):
-            x = a[t[i]]
-            y = b[t[i]]
-            cc = cc + t_weights[i]*pearson_corr_aux(x,y)
+            if t[i][0].shape[0]>0:
+                x = a[t[i]]
+                y = b[t[i]]
+                cc = cc + t_weights[i]*pearson_corr_aux(x,y)
+            else:
+                cc = cc + t_weights[i]
     else:
         a_i = np.argwhere(a != 1e-4)
         a_new = a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]

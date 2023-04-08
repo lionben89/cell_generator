@@ -32,8 +32,8 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/sarithol/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/sarithol/cell_generator/image_list_test.csv"
 else:
-    gv.train_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+    gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
 gv.batch_size = 4 #4
 noise_scale = 5.0
 norm_type = "std"

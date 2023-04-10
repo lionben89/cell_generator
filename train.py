@@ -21,7 +21,7 @@ CONTINUE_TRAINING = True ## False to override current model with the same name
 
 gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
-gv.unet_model_path = "./unet_model_01_03_23_actin_sarit" ## UNET model if in MG mode it is the model that we want to interpret
+gv.unet_model_path = "./unet_model_29_03_23_actin_filaments_sarit" ## UNET model if in MG mode it is the model that we want to interpret
 gv.mg_model_path = "mg_model_membrane_10_06_22_5_0_new_weighted_pcc_0.9"
 gv.clf_model_path = "./clf_model_14_12_22-1"
 gv.organelle = "Actin-filaments" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
@@ -146,11 +146,13 @@ elif (gv.model_type == "UNET"):
     
     if CONTINUE_TRAINING and os.path.exists(gv.unet_model_path):
         unet_pt = keras.models.load_model(gv.unet_model_path)                           
-        unet_model.set_weights(unet_pt.get_weights())  
+        unet_model.set_weights(unet_pt.get_weights())
+        # unet_model.load_weights(gv.unet_model_path)  
     checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),unet_model,gv.unet_model_path)
     early_stop_callback = keras.callbacks.EarlyStopping(patience=50,monitor="val_loss",restore_best_weights=True)
     unet_model.fit(train_dataset,validation_data=validation_dataset, epochs=gv.number_epochs, callbacks=[checkpoint_callback,early_stop_callback])
     unet_model.save(gv.unet_model_path,save_format="tf")
+    # unet_model.save_weights(gv.unet_model_path,save_format="tf")
 
 elif (gv.model_type == "CLF"):
     from models.Classifier import get_clf

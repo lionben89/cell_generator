@@ -15,7 +15,7 @@ sn_model_path = "./sn_model_24_04_22_ne_d"
 clf_model_path = "./clf_model_14_12_22"
 patch_size = (32,128,128,1) ## 2D: (1,*,*,1) , 3D: (*,*,*,1)
 latent_dim = 128 #128 #64 #1024
-number_epochs = 10000
+number_epochs = 100 #10000
 batch_size = 4
 batch_norm = True
 

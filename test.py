@@ -15,9 +15,9 @@ from sklearn.neighbors import KernelDensity
 
 tf.compat.v1.enable_eager_execution()
 
-path = "/sise/assafzar-group/assafzar/GVTNets_data/lamin_b1_model/"
+# path = "/sise/assafzar-group/assafzar/GVTNets_data/lamin_b1_model/"
 
-import tensorflow.compat.v1 as tf1
+# import tensorflow.compat.v1 as tf1
 
 def load_tf1(path, input):
     print('Loading from', path)
@@ -30,13 +30,13 @@ def load_tf1(path, input):
             print('  Output with input', input, ': ', 
                 sess.run(output_name, feed_dict={input_name: input}))
 
-load_tf1(path, np.zeros((32,64,64)))
+# load_tf1(path, np.zeros((32,64,64)))
 gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
 predictors=False #True w_dna
-gv.unet_model_path = "unet_model_22_05_22_membrane_w_dna_32f" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
+gv.unet_model_path = "unet_model_29_03_23_actin_filaments_sarit" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Plasma-membrane" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Actin-filaments" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -44,8 +44,8 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle)
+    gv.train_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
 norm_type = "std" #"minmax"#"std"#
 gv.patch_size = (32,128,128,1)
 
@@ -247,6 +247,12 @@ elif (gv.model_type == "CLF"):
         
 elif (gv.model_type == "UNET"):
     unet = keras.models.load_model(gv.unet_model_path)
+    # from models.UNETO import *
+    # unet = get_unet((gv.patch_size[0],gv.patch_size[1],gv.patch_size[2],2),activation="linear")
+    # unet = UNET(unet)
+    # unet.compile(optimizer = keras.optimizers.Adam(learning_rate=0.0001))
+    # unet.load_weights(gv.unet_model_path)  
+    
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
         os.makedirs("{}/predictions".format(gv.unet_model_path))
     # n = test_dataset.__len__()

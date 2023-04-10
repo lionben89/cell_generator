@@ -75,7 +75,7 @@ class DataGen(keras.utils.Sequence):
                  norm_type="std",
                  for_clf = False):
 
-        self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(
+        self.new_path_origin = "/scratch/sarithol@auth.ad.bgu.ac.il/{}/temp".format(
             os.environ.get('SLURM_JOB_ID'))
         if delete_cahce:
             shutil.rmtree(self.new_path_origin)

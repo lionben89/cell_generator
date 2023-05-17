@@ -20,10 +20,7 @@ def tf_pearson_corr_aux(x,y):
     cc = tf.reduce_mean((x - mean_x) * (y - mean_y)) / (std_x * std_y)
     return cc
 
-def tf_pearson_corr(y_true, y_pred, weights=None):
-    # y_i = tf.where(y_true!=0.0)
-
-    
+def tf_pearson_corr(y_true, y_pred, weights=None):    
     if weights is not None:
         ind = tf.where(tf.logical_or(tf.reshape(weights,[-1])==1.0,tf.reshape(weights,[-1])==255.0))
         non_ind = tf.where(tf.logical_and(tf.reshape(weights,[-1])!=1.0,tf.reshape(weights,[-1])!=255.0))    
@@ -39,16 +36,34 @@ def tf_pearson_corr(y_true, y_pred, weights=None):
         cc = tf_pearson_corr_aux(x,y)
     return cc
 
-def pearson_corr(a,b):
-    a_i = np.argwhere(a != 1e-4)
-    a_new = a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
-    b_new = b[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
+def pearson_corr(a,b,weights=None):
+    if weights is not None:
+        ind = np.where(np.logical_or(weights==1.0,weights==255.0))
+        non_ind = np.where(tf.logical_and(weights!=1.0,weights!=255.0))
+        cc = 0
+        t_weights = [1.0,0.0]
+        t = [ind,non_ind]
+        for i in range(2):
+            if t[i][0].shape[0]>0:
+                x = a[t[i]]
+                y = b[t[i]]
+                cc = cc + t_weights[i]*pearson_corr_aux(x,y)
+            else:
+                cc = cc + t_weights[i]
+    else:
+        a_i = np.argwhere(a != 1e-4)
+        a_new = a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
+        b_new = b[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
+        cc = pearson_corr_aux(a_new,b_new)
+    return cc
+                
+def pearson_corr_aux(a,b):
     
-    mean_a = np.mean(a_new,dtype=np.float64)
-    mean_b = np.mean(b_new,dtype=np.float64)
-    std_a = np.std(a_new - mean_a,dtype=np.float64)
-    std_b = np.std(b_new - mean_b,dtype=np.float64)
-    cc = np.mean((a_new - mean_a) * (b_new - mean_b)) / (std_a * std_b)
+    mean_a = np.mean(a,dtype=np.float64)
+    mean_b = np.mean(b,dtype=np.float64)
+    std_a = np.std(a - mean_a,dtype=np.float64)
+    std_b = np.std(b - mean_b,dtype=np.float64)
+    cc = np.mean((a - mean_a) * (b - mean_b)) / (std_a * std_b)
     return cc
 
 def dice(a,b):

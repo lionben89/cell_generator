@@ -38,16 +38,16 @@ class MaskGenerator(keras.Model):
         self.pcc_target = pcc_target
         self.unet = unet
         
-        image_input = keras.layers.Input(shape=patch_size,dtype=tf.float16)
-        target_input = keras.layers.Input(shape=patch_size,dtype=tf.float16)
+        image_input = keras.layers.Input(shape=patch_size,dtype=tf.float32)
+        target_input = keras.layers.Input(shape=patch_size,dtype=tf.float32)
         processed_target = keras.layers.Conv3D(filters=32,kernel_size=3,padding="same",activation="relu")(target_input)
         processed_image = keras.layers.Conv3D(filters=32,kernel_size=3,padding="same",activation="relu")(image_input)
         processed_input = keras.layers.Concatenate(axis=-1)([processed_image,processed_target])
         # processed_input = processed_image
-        mask = tf.cast(adaptor(processed_input),dtype=tf.float32)
+        mask = tf.cast(adaptor(processed_input),dtype=tf.float64)
         # mask = -tf.nn.max_pool3d(-mask, ksize=3, strides=1,padding="SAME", name='erosion3D')
         # mask = tf.nn.max_pool3d(mask, ksize=3, strides=1, padding="SAME", name='dilation3D')
-        mask = tf.cast(mask,dtype=tf.float64)
+        # mask = tf.cast(mask,dtype=tf.float64)
         self.generator = keras.Model([image_input,target_input],mask,name="generator")
         # self.generator = keras.Model(image_input,mask,name="generator")
         
@@ -175,13 +175,15 @@ class MaskGenerator(keras.Model):
                 pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
             # inv_pcc_loss = tf.math.abs(tf_pearson_corr(unet_target,inv_unet_predictions))
             
-            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*5000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
-            
+            # total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+            total_loss = (1-self.mask_loss_weight)*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+
+
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights)) 
         
-        self.mask_ratio.update_state((1-mask)) #tf.reduce_sum(mask)
+        self.mask_ratio.update_state((1-mean_mask)) #tf.reduce_sum(mask)
         self.unet_loss_tracker.update_state(unet_loss)  
         self.blob_ratio.update_state(tf.zeros_like(mask), mask)
         self.pcc.update_state(pcc_loss)

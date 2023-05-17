@@ -85,11 +85,11 @@ def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
         return keras.Model(input,output,name=name)  
 
 class UNET(keras.Model):
-    def __init__(self, unet, **kwargs):
+    def __init__(self, unet,num_channels, **kwargs):
         super(UNET, self).__init__(**kwargs)
         
         self.unet = unet
-        
+        self.num_channels = num_channels
         self.loss_tracker = keras.metrics.Mean(
             name="loss"
         )
@@ -109,7 +109,7 @@ class UNET(keras.Model):
         
         # Train unet
         with tf.GradientTape() as tape:
-            if len(data[0])>1:
+            if self.num_channels>1:
                 prediction = self.unet(tf.concat(data[0],axis=-1))
             else:
                 prediction = self.unet(data[0])
@@ -138,7 +138,7 @@ class UNET(keras.Model):
         return self.train_step(data,False)    
     
     def call(self,input):
-        if len(input)>1:
+        if self.num_channels>1:
             prediction = self.unet(tf.concat([input[0],input[1]],axis=-1))
         else:
             prediction = self.unet(input)

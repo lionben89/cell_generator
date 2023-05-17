@@ -25,16 +25,16 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 # gv.mg_model_path = "./mg_model_ne_10_06_22_5_0_new_weighted_pcc_1000"
-gv.mg_model_path = "./mg_model_actin_10_06_22_5_0_new"
-gv.organelle = "Actin-filaments" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
+gv.mg_model_path = "./mg_model_24_04_23_tight_junction_loss_weight_0.75_sarit" #"mg_model_10_04_23_actin_filaments_loss_weight_0.1_sarit" #"./mg_model_16_04_23_actomyosin_bundles_loss_weight_0.1_sarit"
+gv.organelle = "Tight-junctions" #"Actomyosin-bundles" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
 #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)","Actin-filaments"
-gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+gv.train_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
 
-compound = "paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
+compound = None #"paclitaxol_vehicle" #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
 if compound is not None:
     ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
 else:
-    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+    ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
 
 weighted_pcc = False
 # weighted_pcc = True

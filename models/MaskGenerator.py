@@ -175,8 +175,10 @@ class MaskGenerator(keras.Model):
                 pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
             # inv_pcc_loss = tf.math.abs(tf_pearson_corr(unet_target,inv_unet_predictions))
             
-            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
-            
+            # total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+            total_loss = (1-self.mask_loss_weight)*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+
+
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights)) 

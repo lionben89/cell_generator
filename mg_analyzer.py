@@ -1,5 +1,4 @@
 from copy import deepcopy
-from email.mime import image
 import gc
 from numpy import dtype
 from scipy import signal
@@ -24,15 +23,17 @@ gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
-# gv.mg_model_path = "./mg_model_ne_10_06_22_5_0_new_weighted_pcc_1000"
-gv.mg_model_path = "./mg_model_actin_10_06_22_5_0_new"
-gv.organelle = "Actin-filaments" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
-#"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)","Actin-filaments"
+# gv.mg_model_path = "./mg_model_mito_10_06_22_5_0_new_weighted_pcc_1000"
+# gv.mg_model_path = "./mg_model_ngc_10_06_22_5_0_new"
+
+gv.organelle = "Nucleolus-(Granular-Component)" #"Nuclear-envelope" #"Golgi" #"Tight-junctions" #"Microtubules" #"Endoplasmic-reticulum" #"Plasma-membrane" 
+#"Plasma-membrane" #"Mitochondria" #"Nucleolus-(Granular-Component)","Actin-filaments"
 gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
 
-compound = "paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
+compound = None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #"staurosporine"
+drug = "Vehicle"
 if compound is not None:
-    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
+    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug)
 else:
     ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
 
@@ -50,7 +51,7 @@ images = range(10) #range(10,20,1)#[0,1,2,3,4,5]#range(5,9,1) #list(np.random.ra
 noise_scale = 5.0
 
 ## Batch size
-batch_size=4
+batch_size=1
 
 ## Image center
 center_xy = [312,462] #[200,100]
@@ -60,21 +61,21 @@ margin=[192,256] #[256,256]#
 xy_step = 64
 z_step = 16
 
-## Load model
-print("Loading model:",gv.mg_model_path)
-model = keras.models.load_model(gv.mg_model_path)
+# ## Load model
+# print("Loading model:",gv.mg_model_path)
+# model = keras.models.load_model(gv.mg_model_path)
 
 def predict(model,data,batch_size):   
     tf.keras.backend.clear_session()
     _ = gc.collect() 
-    # batch_data = data.reshape((-1,batch_size,*gv.patch_size))
-    # output = np.zeros_like(batch_data)
-    # for i in range(batch_data.shape[0]):
-    #     batch_pred = model.predict_on_batch(batch_data[i])
-    #     output[i] = batch_pred
-    # output = output.reshape(data.shape)
+    batch_data = data.reshape((-1,batch_size,*gv.patch_size))
+    output = np.zeros_like(batch_data)
+    for i in range(batch_data.shape[0]):
+        batch_pred = model.predict_on_batch(batch_data[i])
+        output[i] = batch_pred
+    output = output.reshape(data.shape)
     
-    output = model.predict(data,batch_size=batch_size)
+    # output = model.predict(data,batch_size=batch_size)
     return output
 
 def _get_weights(shape):
@@ -350,7 +351,8 @@ def analyze_th(mode,mask_image=None,manual_th="full",save_image=True,save_histo=
         histos.add_row(avg_histo)
         histos.create()
         histos_fig.savefig("{}/histograms.png".format(dir_path))
-    
+
+## noise percent of the mask-organelle intersection    
 def analyze_correlations(organelles,mask_th,save_images=True,organelle_precent_pixels=1.0):
     ## Create main dir and organelle subdir
     pred_path = "predictions_correlations"
@@ -364,7 +366,7 @@ def analyze_correlations(organelles,mask_th,save_images=True,organelle_precent_p
         create_dir_if_not_exist(dir_path)
     
         corr_results = DatasetMetadataSCV("{}/corr_resuls_{}_organelle_precent_pixels_{}.csv".format(dir_path,organelle,organelle_precent_pixels))
-        corr_results.create_header(["ratio_of_organelle_in_image","ratio_of_mask_in_image","ratio_of_mask_organelle_intersection_in_mask","ratio_of_mask_organelle_intersection_in_organelle","ratio_of_random_pixels_in_mask","ratio_of_mask_organelle_intersection_in_image","ratio_of_random_pixels_organelle_in_mask","ratio_of_random_pixels_outside_organelle_in_mask","pcc","pcc_wo","pcc_wo_organelle_pixels","pcc_random"])
+        corr_results.create_header(["ratio_of_organelle_in_image","ratio_of_mask_in_image","ratio_of_mask_organelle_intersection_in_mask","ratio_of_mask_organelle_intersection_in_organelle","ratio_of_random_pixels_in_mask","ratio_of_mask_organelle_intersection_in_image","ratio_of_random_pixels_organelle_in_mask","ratio_of_random_pixels_outside_organelle_in_mask","pcc","pcc_wo","pcc_wo_organelle_pixels","pcc_random","importance_in_organelle"])
         ds_organelle = organelle
         train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(ds_organelle)
         test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(ds_organelle)
@@ -543,24 +545,46 @@ def analyze_correlations(organelles,mask_th,save_images=True,organelle_precent_p
             
         corr_results.create()
 
-def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_organelle_precent_pixels=0.05):
+## noise percent of the mask that intersect with the organelle
+def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_organelle_precent_pixels=0.05,compound=None,is_vehicle=False,model_path=gv.mg_model_path):
     ## Create main dir and organelle subdir
     pred_path = "predictions_correlations_constant"
         
-    base_dir_path = "{}/{}".format(gv.mg_model_path,pred_path)
+    base_dir_path = "{}/{}".format(model_path,pred_path)
     create_dir_if_not_exist(base_dir_path)
-    repeat = 5
+    repeat = 3
     for organelle in organelles:
         print(organelle)
-        dir_path = "{}/{}".format(base_dir_path,organelle)
+        if (compound is not None):
+            if is_vehicle:
+                ov = "Vehicle"
+            else:
+                ov = compound
+            dir_path = "{}/{}_{}".format(base_dir_path,organelle,compound,ov)
+        else:
+            dir_path = "{}/{}".format(base_dir_path,organelle)
+            
         create_dir_if_not_exist(dir_path)
     
-        corr_results = DatasetMetadataSCV("{}/corr_resuls_{}_organelle_precent_pixels_{}.csv".format(dir_path,organelle,absoulte_organelle_precent_pixels))
-        corr_results.create_header(["ratio_of_organelle_in_image","ratio_of_mask_in_image","ratio_of_mask_organelle_intersection_in_mask","ratio_of_mask_organelle_intersection_in_organelle","ratio_of_mask_organelle_intersection_in_image", "ratio_of_noised_pixels_in_mask","pcc","pcc_wo_organelle_pixels"])
-        ds_organelle = organelle
-        train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(ds_organelle)
-        test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(ds_organelle)
-        dataset = DataGen(train_ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
+        if is_vehicle:
+            drug = "Vehicle"
+        else:
+            drug = compound
+            
+        if compound is not None:
+            ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(organelle,compound,drug)
+        else:
+            ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(organelle)
+    
+        corr_results = DatasetMetadataSCV("{}/corr_results_{}_{}_organelle_precent_pixels_{}_in_image.csv".format(dir_path,organelle, drug, absoulte_organelle_precent_pixels))
+        corr_results.create_header(["ratio_of_organelle_in_image","ratio_of_mask_in_image","ratio_of_mask_organelle_intersection_in_mask","ratio_of_mask_organelle_intersection_in_organelle","ratio_of_mask_organelle_intersection_in_image","ratio_of_noised_pixels_wo_mask_in_image","ratio_of_noised_pixels_with_mask_in_image","ratio_of_noised_random_flip_in_image","ratio_of_noised_random_pixels_in_image","pcc","pcc_wo_organelle_pixels","pcc_wo_organelle_pixels_wo_mask","pcc_random_flip","pcc_random_pixels"])    
+        
+        try:
+            dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
+        except:
+            print ("{} not exist, continue...".format(ds_path))
+            continue
+        
         images = range(min([dataset.df.get_shape()[0],10]))
         item = 0
         for image_index in images:
@@ -615,39 +639,75 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
                 ImageUtils.imsave(nuc_image.astype(np.float16),"{}/nuc_{}.tiff".format(base_save,image_index)) 
                 ImageUtils.imsave(mem_image.astype(np.float16),"{}/mem_{}.tiff".format(base_save,image_index))  
                 ImageUtils.imsave((unet_p/d).astype(np.float16),"{}/unet_prediction_{}.tiff".format(base_save,image_index))                  
-            for r in range(repeat):                
+            for r in range(repeat):  
+                ## generate new noise vector
+                normal_noise = tf.random.normal(tf.shape(mask_patchs_p),stddev=noise_scale,dtype=tf.float32)              
                 print("mask predict ...")
                 mask_p_binary = tf.where(mask_p_full>mask_th,1.0,0.0)
                 mask_p = tf.where((mask_p_binary)>0.0,1.0,0.0)
                 mask_organelle_itersection = (mask_p_binary * target_seg_image)
                 ratio_of_organelle_in_image = np.sum(target_seg_image,dtype=np.float64)/np.prod(target_seg_image.shape)
+                
                 ratio_of_mask_organelle_intersection_in_image = np.sum(mask_organelle_itersection,dtype=np.float64)/np.prod(mask_organelle_itersection.shape)
                 ratio_of_mask_in_image = np.sum(mask_p_binary,dtype=np.float64)/np.prod(mask_p_binary.shape)
                 ratio_of_mask_organelle_intersection_in_mask = np.sum(mask_organelle_itersection,dtype=np.float64)/np.sum(mask_p_binary,dtype=np.float64)
                 
-                organelle_precent_pixels = absoulte_organelle_precent_pixels/ratio_of_mask_organelle_intersection_in_mask
-                if organelle_precent_pixels > 1.0:
+                ratio_of_noise_pixels_in_image = absoulte_organelle_precent_pixels
+                organelle_precent_pixels = absoulte_organelle_precent_pixels/ratio_of_mask_organelle_intersection_in_image
+                ax = r #np.random.randint(0,3)
+                target_seg_image_flip = np.flip(target_seg_image,axis=ax)  
+                ratio_of_organelle_in_image_flip = np.sum((target_seg_image_flip*(1-target_seg_image)),dtype=np.float64)/np.prod(target_seg_image.shape)
+                
+                if organelle_precent_pixels > 1.0 or ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image > 1.0 or ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image_flip > 1.0:
                     item +=1
                     continue
                 organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(organelle_precent_pixels),organelle_precent_pixels])
-                mask_p_binary_wo_organelle_pixels = tf.math.minimum((mask_p_binary * (1-organelle_pixels_target_seg_image))+((1-target_seg_image)*mask_p_binary),1.0)
+                mask_p_binary_wo_organelle_pixels = 1 - organelle_pixels_target_seg_image*mask_organelle_itersection #+ (1-target_seg_image) + (1-mask_p_binary),0.0)
                 mask_p_wo_organelle_pixels = tf.where(mask_p_binary_wo_organelle_pixels>0.0,1.0,0.0)
+                
+                organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image),ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image])
+                wo_organelle_pixels_binary = tf.math.minimum((target_seg_image * (1 - organelle_pixels_target_seg_image))+((1-target_seg_image)),1.0)
+                wo_organelle_pixels = tf.where(wo_organelle_pixels_binary>0.0,1.0,0.0)  
+                
+                # random_pixels_binary = np.random.choice([1.0,0.0],target_seg_image.shape,p=[1-(absoulte_organelle_precent_pixels),absoulte_organelle_precent_pixels])
+                # random_pixels = tf.where(random_pixels_binary>0.0,1.0,0.0)  
+                
+                organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image_flip),ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image_flip])
+                random_flip_binary = tf.math.minimum(((1-target_seg_image)*target_seg_image_flip * (1 - organelle_pixels_target_seg_image))+((1-target_seg_image_flip))+(target_seg_image*target_seg_image_flip),1.0)
+                random_flip = tf.where(random_flip_binary>0.0,1.0,0.0)                                              
+                del organelle_pixels_target_seg_image
+                del target_seg_image_flip
+                
+                random_pixels_binary = np.random.choice([0.0,1.],target_seg_image.shape,p=[ratio_of_noise_pixels_in_image,1-ratio_of_noise_pixels_in_image])
+                random_pixels = tf.where(random_pixels_binary>0.0,1.0,0.0)
                 
                 ## Create noisy input and predict unet
                 mask_patchs_p_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,mask_p)
                 mask_patchs_p_wo_organelle_pixels_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,mask_p_wo_organelle_pixels)
+                wo_organelle_pixels_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,wo_organelle_pixels)
+                random_flip_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,random_flip)
+                random_pixels_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,random_pixels)
                 
                 mask_noise_patchs = (normal_noise*(1-mask_patchs_p_term))
                 mask_noise_wo_organelle_pixels_patchs = (normal_noise*(1-mask_patchs_p_wo_organelle_pixels_term))
+                wo_organelle_pixels_patchs = (normal_noise*(1-wo_organelle_pixels_term))
+                random_flip_patchs = (normal_noise*(1-random_flip_term))
+                random_pixels_patchs = (normal_noise*(1-random_pixels_term))
                 
                 input_patchs_p = (mask_patchs_p_term*input_patchs)+mask_noise_patchs
                 input_patchs_wo_organelle_pixels_p = (mask_patchs_p_wo_organelle_pixels_term*input_patchs)+mask_noise_wo_organelle_pixels_patchs
+                input_patchs_wo_organelle_pixels_wo_mask_p = (wo_organelle_pixels_term*input_patchs)+wo_organelle_pixels_patchs
+                input_patchs_random_flip_p = (random_flip_term*input_patchs)+random_flip_patchs
+                input_patchs_random_pixels_p = (random_pixels_term*input_patchs)+random_pixels_patchs
                 
                 unet_noise_patchs_p = predict(model.unet,input_patchs_p.numpy(),batch_size)
                 unet_noise_patchs_wo_organelle_pixels_p = predict(model.unet,input_patchs_wo_organelle_pixels_p.numpy(),batch_size)
-        
+                unet_noise_patchs_wo_organelle_pixels_wo_mask_p = predict(model.unet,input_patchs_wo_organelle_pixels_wo_mask_p.numpy(),batch_size)
+                unet_noise_patchs_random_flip_p = predict(model.unet,input_patchs_random_flip_p.numpy(),batch_size)
+                unet_noise_patchs_random_pixels_p = predict(model.unet,input_patchs_random_pixels_p.numpy(),batch_size)
+                
                 ## Back to image 
-                input_p,unet_noise_p,unet_noise_wo_organelle_pixels_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p,unet_noise_patchs_wo_organelle_pixels_p],weights,input_image.shape)
+                input_p,unet_noise_p,unet_noise_wo_organelle_pixels_p,unet_noise_wo_organelle_pixels_wo_mask_p,unet_noise_random_flip_p,unet_noise_random_pixels_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p,unet_noise_patchs_wo_organelle_pixels_p,unet_noise_patchs_wo_organelle_pixels_wo_mask_p,unet_noise_patchs_random_flip_p,unet_noise_patchs_random_pixels_p],weights,input_image.shape)
                 
                 ## Save images
                 if image_index<save_images:
@@ -657,47 +717,78 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
                     ImageUtils.imsave(target_seg_image.astype(np.float16),"{}/seg_source_organelle_{}.tiff".format(base_save,image_index))
                     ImageUtils.imsave((input_p/d).astype(np.float16),"{}/noisy_input_{}.tiff".format(base_save,image_index))
                     ImageUtils.imsave((unet_noise_p/d).astype(np.float16),"{}/noisy_unet_prediction_{}.tiff".format(base_save,image_index)) 
-                    ImageUtils.imsave((unet_noise_wo_organelle_pixels_p).astype(np.float16),"{}/noisy_unet_prediction_wo_organelle_pixels_{}.tiff".format(base_save,image_index))
+                    ImageUtils.imsave((unet_noise_wo_organelle_pixels_p/d).astype(np.float16),"{}/noisy_unet_prediction_wo_organelle_pixels_{}.tiff".format(base_save,image_index))
+                    ImageUtils.imsave((unet_noise_wo_organelle_pixels_wo_mask_p/d).astype(np.float16),"{}/noisy_unet_prediction_wo_organelle_pixels_wo_mask_{}.tiff".format(base_save,image_index))
+                    ImageUtils.imsave((unet_noise_random_flip_p/d).astype(np.float16),"{}/noisy_unet_prediction_random_flip_{}.tiff".format(base_save,image_index))
+                    ImageUtils.imsave((unet_noise_random_pixels_p/d).astype(np.float16),"{}/noisy_unet_prediction_random_pixels_{}.tiff".format(base_save,image_index))
 
                 pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:])
                 pcc_wo_organelle_pixels = pearson_corr((unet_p/d)[:,:,:], (unet_noise_wo_organelle_pixels_p/d)[:,:,:])
-
-                
-                print("pearson corr for image:{} reapet:{} is :{} wo organelle pixels:{}".format(image_index,r,pcc,pcc_wo_organelle_pixels)) 
+                pcc_wo_organelle_pixels_wo_mask = pearson_corr((unet_p/d)[:,:,:], (unet_noise_wo_organelle_pixels_wo_mask_p/d)[:,:,:])
+                pcc_random_flip = pearson_corr((unet_p/d)[:,:,:], (unet_noise_random_flip_p/d)[:,:,:])
+                pcc_random_pixels = pearson_corr((unet_p/d)[:,:,:], (unet_noise_random_pixels_p/d)[:,:,:])
                 
                 corr_results.set_item(item,"ratio_of_organelle_in_image",ratio_of_organelle_in_image)
                 corr_results.set_item(item,"ratio_of_mask_in_image",ratio_of_mask_in_image)
                 corr_results.set_item(item,"ratio_of_mask_organelle_intersection_in_image",ratio_of_mask_organelle_intersection_in_image)
                 corr_results.set_item(item,"ratio_of_mask_organelle_intersection_in_mask",ratio_of_mask_organelle_intersection_in_mask)
                 corr_results.set_item(item,"ratio_of_mask_organelle_intersection_in_organelle",np.sum(mask_organelle_itersection,dtype=np.float64)/np.sum(target_seg_image,dtype=np.float64))
-                corr_results.set_item(item,"ratio_of_noised_pixels_in_mask",1 - np.sum(mask_p_binary_wo_organelle_pixels.numpy(),dtype=np.float64)/np.sum(mask_p_binary,dtype=np.float64))
+                # corr_results.set_item(item,"ratio_of_noised_pixels_in_mask",1 - np.sum(mask_p_binary_wo_organelle_pixels.numpy(),dtype=np.float64)/np.sum(mask_p_binary,dtype=np.float64))
+                corr_results.set_item(item,"ratio_of_noised_pixels_wo_mask_in_image",(1-np.sum(wo_organelle_pixels_binary.numpy(),dtype=np.float64)/np.prod(wo_organelle_pixels_binary.shape)))
+                corr_results.set_item(item,"ratio_of_noised_pixels_with_mask_in_image",(1-np.sum(mask_p_binary_wo_organelle_pixels.numpy(),dtype=np.float64)/np.prod(wo_organelle_pixels_binary.shape)))
+                corr_results.set_item(item,"ratio_of_noised_random_flip_in_image",(1-np.sum(random_flip,dtype=np.float64)/np.prod(wo_organelle_pixels_binary.shape)))
+                corr_results.set_item(item,"ratio_of_noised_random_pixels_in_image",(1-np.sum(random_pixels,dtype=np.float64)/np.prod(wo_organelle_pixels_binary.shape)))
                 
         
                 corr_results.set_item(item,"pcc",pcc)
                 corr_results.set_item(item,"pcc_wo_organelle_pixels",pcc_wo_organelle_pixels)
+                corr_results.set_item(item,"pcc_wo_organelle_pixels_wo_mask",pcc_wo_organelle_pixels_wo_mask)
+                corr_results.set_item(item,"pcc_random_flip",pcc_random_flip)
+                corr_results.set_item(item,"pcc_random_pixels",pcc_random_pixels) 
                 
+                importance_in_organelle = np.sum(mask_p_full * target_seg_image,dtype=np.float64)/np.sum(target_seg_image,dtype=np.float64)
+                corr_results.set_item(item,"importance_in_organelle",importance_in_organelle)
+                
+                print("pearson corr for image to mask:{} reapet:{} is :{} wo organelle pixels in mask:{}, wo organelle pixels:{}, random flip:{}, random pixels:{}, importance_in_organelle:{}".format(image_index,r,pcc,pcc_wo_organelle_pixels,pcc_wo_organelle_pixels_wo_mask,pcc_random_flip,pcc_random_pixels,importance_in_organelle)) 
+                     
                 item +=1
                 del input_patchs_p
-                del input_patchs_wo_organelle_pixels_p               
+                del input_patchs_wo_organelle_pixels_p  
+                del input_patchs_wo_organelle_pixels_wo_mask_p 
+                del unet_noise_patchs_wo_organelle_pixels_wo_mask_p            
                 del unet_noise_patchs_p
                 del unet_noise_wo_organelle_pixels_p
                 del input_p
                 del unet_noise_p
                 del mask_noise_patchs
                 del mask_noise_wo_organelle_pixels_patchs
+                del wo_organelle_pixels_patchs
+                del mask_p_wo_organelle_pixels
+                del wo_organelle_pixels
+                del random_flip
+                del random_flip_patchs
+                del input_patchs_random_flip_p
+                del unet_noise_patchs_random_flip_p
+                del unet_noise_random_flip_p
+                del random_pixels
+                del random_pixels_patchs
+                del input_patchs_random_pixels_p
+                del unet_noise_patchs_random_pixels_p
+                del unet_noise_random_pixels_p
+                del normal_noise
                 
-            del normal_noise
+            
             del unet_patchs_p
             del mask_patchs_p
         corr_results.create()
         
 # analyze_correlations(save_images=3, mask_th=0.7, organelle_precent_pixels=0.5, organelles=["Plasma-membrane","Nuclear-envelope","Endoplasmic-reticulum","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes","Golgi"])
-# analyze_correlations_constant(save_images=3, mask_th=0.8, absoulte_organelle_precent_pixels=0.01, organelles=["Golgi","Plasma-membrane","Nuclear-envelope","Endoplasmic-reticulum","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes"])
-# analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Lysosome","Adherens-junctions","Gap-junctions","Matrix-adhesions","Peroxisomes","Endosomes"])
-# analyze_correlations_constant(save_images=3, mask_th=0.5, absoulte_organelle_precent_pixels=0.01, organelles=["Microtubules"])
+# analyze_correlations_constant(save_images=3, mask_th=0.6, absoulte_organelle_precent_pixels=0.001, organelles=["Peroxisomes","Endosomes"])#["Nuclear-envelope","Endoplasmic-reticulum","Golgi","Plasma-membrane","Nucleolus-(Dense-Fibrillar-Component)","Nucleolus-(Granular-Component)","Microtubules","Tight-junctions","Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes","Lysosome","Adherens-junctions","Gap-junctions","Matrix-adhesions","Peroxisomes","Endosomes"])
+# analyze_correlations_constant(save_images=3, mask_th=0.65, absoulte_organelle_precent_pixels=0.001, organelles=["Mitochondria","Actomyosin-bundles","Actin-filaments","Desmosomes","Lysosome","Adherens-junctions","Gap-junctions","Matrix-adhesions","Peroxisomes","Endosomes"])
+# analyze_correlations_constant(save_images=3, mask_th=0.8, absoulte_organelle_precent_pixels=0.03, organelles=["Microtubules"])
 
-analyze_th("regular",save_histo=True,save_image=True,weighted_pcc=weighted_pcc)
-# analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=False,save_histo=False,weighted_pcc=weighted_pcc)
+# analyze_th("regular",save_histo=True,save_image=True,weighted_pcc=weighted_pcc)
+# analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc=weighted_pcc)
 # for mth in [0.85]:
     # analyze_th("regular",mask_image=None,manual_th=mth,save_image=True,save_histo=False)
 # analyze_th("mask","{}/X_gradcam_layer_downsample_4_full.tiff".format(gv.mg_model_path)) #gbp_full.tiff #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
@@ -705,10 +796,25 @@ analyze_th("regular",save_histo=True,save_image=True,weighted_pcc=weighted_pcc)
 # analyze_th("mask","{}/predictions_masked/4/MASK_2.tif".format(gv.mg_model_path))
 # analyze_th("agg")
 # analyze_th("loo")
+
 # analyze_correlations(save_images=3,mask_th=0.85,organelles=["Endoplasmic-reticulum","Plasma-membrane","Actin-filaments"])
 # analyze_correlations(save_images=3,mask_th=0.85,organelles=["Golgi","Microtubules","Nucleolus-(Dense-Fibrillar-Component)"])
 # analyze_correlations(save_images=3,mask_th=0.85,organelles=["Mitochondria","Tight-junctions","Nucleolus-(Granular-Component)"])
 # analyze_correlations(save_images=3,mask_th=0.85,organelles=["Actomyosin-bundles","Nuclear-envelope","Desmosomes"])
+
+##perturbations
+params = [{"model":"./mg_model_microtubules_10_06_22_5_0_new","th":0.6},{"model":"./mg_model_actin_10_06_22_5_0_new","th":0.75},{"model":"./mg_model_mito_10_06_22_5_0_new","th":0.7},{"model":"./mg_model_membrane_10_06_22_5_0_new","th":0.75},{"model":"./mg_model_ne_10_06_22_5_0_new","th":0.55},{"model":"./mg_model_ngc_10_06_22_5_0_new","th":0.45},{"model":"./mg_model_golgi_10_06_22_5_0_new","th":0.6}]
+## Load model
+compounds = ["Brefeldin"] ##["s-Nitro-Blebbistatin","Rapamycin","Paclitaxol","Staurosporine","Brefeldin"]
+for compound in compounds:
+    print(compound)
+    for param in params: 
+        tf.keras.backend.clear_session()
+        print("Loading model:",param["model"])
+        model = keras.models.load_model(param["model"])
+        for is_vehicle in [True,False]:
+            analyze_correlations_constant(save_images=1,absoulte_organelle_precent_pixels=0.001, mask_th=param["th"], compound=compound, is_vehicle=is_vehicle, organelles=["Actin filaments","Endoplasmic reticulum","Lysosome","Microtubules","Tight junctions","Golgi","Actomyosin bundles"],model_path=param["model"])
+
                 
         
         

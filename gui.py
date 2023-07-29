@@ -12,9 +12,9 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 gv.patch_size = (32,128,128,1)
-gv.unet_model_path = "/sise/home/lionb/unet_model_22_05_22_ne_128"
-gv.mg_model_path = "/sise/home/lionb/mg_model_ne_10_06_22_5_0_new"
-gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.unet_model_path = "/sise/home/lionb/unet_model_22_05_22_mito_128"
+gv.mg_model_path = "/sise/home/lionb/mg_model_mito_10_06_22_5_0_new"
+gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 upper_layout = [
@@ -106,7 +106,9 @@ middle_layout = [[
                                  disabled=False,
                                  enable_events=True),
                      sg.Button('Calculate', disabled=True)
-                 ]
+                 ],
+                 [sg.Text("Mask TH:"),sg.Input(key='-NP TH-', default_text=0.5,size=(5, 1)),sg.Button('Noise prediction', disabled=True)],
+                 [sg.Button('Evaluate interperters', disabled=True)]
                  ]
 
 
@@ -165,6 +167,16 @@ def create_images_layout():
                                   default_text=0.0,
                                   size=(15, 1),
                                   readonly=True),
+                         sg.Text("Pearson score of slice - noise:"),
+                         sg.Input(key='-NOISE PEARSON-',
+                                  default_text=0.0,
+                                  size=(15, 1),
+                                  readonly=True),
+                         sg.Text("Weighted Pearson score - noise:"),
+                         sg.Input(key='-NOISE WEIGHT PEARSON-',
+                                  default_text=0.0,
+                                  size=(15, 1),
+                                  readonly=True),                         
                      ],
                              [
                                  sg.Column([[sg.Text("BF")],
@@ -186,7 +198,12 @@ def create_images_layout():
                                             [
                                                 sg.Image(key='-GC-',
                                                          enable_events=True)
-                                            ]])
+                                            ]]),
+                                 sg.Column([[sg.Text("NOISE PREDICTION")],
+                                            [
+                                                sg.Image(key='-NP-',
+                                                         enable_events=True)
+                                            ]])                                 
                              ]],
                      expand_x=True,
                      expand_y=True)
@@ -226,6 +243,8 @@ slice = None
 layers = None
 selected_layer = None
 
+mask_norm = None
+
 signal = None
 target = None
 prediction = None
@@ -235,12 +254,14 @@ membrane = None
 mem_seg_image = None
 target_seg_image = None
 target_seg_image_dilated = None
+noise_prediction = None
 
 signal_mm = None
 target_mm = None
 prediction_mm = None
 dna_mm = None
 membrane_mm = None
+noise_prediction_mm = None
 
 sliced_signal = None
 sliced_target = None
@@ -248,11 +269,13 @@ sliced_prediction = None
 sliced_mask = None
 sliced_dna = None
 sliced_membrane = None
+sliced_noise_prediction = None
 
 sliced_signal_s = None
 sliced_target_s = None
 sliced_prediction_s = None
 sliced_mask_s = None
+sliced_noise_prediction_s = None
 
 roi_mode = "subset"
 roi_args = None
@@ -263,7 +286,7 @@ end_x = None
 end_y = None
 
 main_image_ndarray = None
-scale_percent = 0.45
+scale_percent = 0.33
 
 history = {}
 history_image = None
@@ -280,15 +303,28 @@ gamma = 0.0
 
 
 def show_all(is_nuc_on, is_mem_on):
-    global sliced_signal, sliced_target, sliced_prediction, sliced_mask, sliced_membrane, sliced_dna, sliced_signal_s, sliced_target_s, sliced_prediction_s, sliced_mask_s
+    global sliced_signal, sliced_target, sliced_prediction, sliced_mask, sliced_membrane, sliced_dna, sliced_noise_prediction, sliced_signal_s, sliced_target_s, sliced_prediction_s, sliced_mask_s, sliced_noise_prediction_s
 
     sliced_signal = signal_mm[slice, :, :]
     sliced_target = target_mm[slice, :, :]
     sliced_prediction = prediction_mm[slice, :, :]
+ 
     score = pearson_corr(np.expand_dims(sliced_target,axis=-1), np.expand_dims(sliced_prediction,axis=-1))
     images_window['-PEARSON-'].update(score)
     weighted_score = pearson_corr(np.expand_dims(sliced_target,axis=-1), np.expand_dims(sliced_prediction,axis=-1),np.expand_dims(target_seg_image_dilated[slice, :, :],axis=-1))
     images_window['-WEIGHT PEARSON-'].update(weighted_score)
+    
+    if noise_prediction is not None:
+        try:
+            roi = get_roi(roi_mode, roi_args, signal)
+            sliced_noise_prediction = noise_prediction_mm[slice, :, :]
+            noise_score = pearson_corr(np.expand_dims(sliced_prediction*roi.roi,axis=-1), np.expand_dims(sliced_noise_prediction*roi.roi,axis=-1))
+            images_window['-NOISE PEARSON-'].update(noise_score)
+            noise_weighted_score = pearson_corr(np.expand_dims(sliced_prediction*roi.roi,axis=-1), np.expand_dims(sliced_noise_prediction*roi.roi,axis=-1),np.expand_dims(target_seg_image_dilated[slice, :, :]*roi.roi,axis=-1))
+            images_window['-NOISE WEIGHT PEARSON-'].update(noise_weighted_score)   
+        except Exception as e:
+            print("noise-pearson can not be calculated")
+        
     if (mask is not None):
         sliced_mask = mask[slice, :, :].astype(np.float32)
 
@@ -455,12 +491,19 @@ def show_all(is_nuc_on, is_mem_on):
         sliced_mask_s = cv2.resize(sliced_mask,
                                    dim,
                                    interpolation=cv2.INTER_AREA)
+        
+    if (sliced_noise_prediction is not None):
+        sliced_noise_prediction_s = cv2.resize(sliced_noise_prediction,
+                                   dim,
+                                   interpolation=cv2.INTER_AREA)        
 
     show_image(sliced_signal_s, '-BF-')
     show_image(sliced_target_s, '-GT-')
     show_image(sliced_prediction_s, '-PR-')
     if (sliced_mask is not None):
         show_image(sliced_mask_s, '-GC-')
+    if (sliced_noise_prediction is not None):
+        show_image(sliced_noise_prediction_s, '-NP-')        
 
 def binds_all():
     # Mouse events bind
@@ -476,6 +519,10 @@ def binds_all():
     images_window['-GC-'].Widget.bind(
         "<Button-1>",
         lambda event: on_image_left_click(event, sliced_mask_s, '-GC-'))
+    images_window['-NP-'].Widget.bind(
+        "<Button-1>",
+        lambda event: on_image_left_click(event, sliced_noise_prediction_s, '-NP-'))    
+    
     images_window['-MAIN IMAGE-'].Widget.bind(
         "<Button-1>", lambda event: on_image_left_click(
             event, main_image_ndarray, '-MAIN IMAGE-', scale_percent))
@@ -492,6 +539,10 @@ def binds_all():
     images_window['-GC-'].Widget.bind(
         "<B1-Motion>",
         lambda event: on_image_left_motion(event, sliced_mask_s, '-GC-'))
+    images_window['-NP-'].Widget.bind(
+        "<B1-Motion>",
+        lambda event: on_image_left_motion(event, sliced_noise_prediction_s, '-NP-'))    
+    
     images_window['-MAIN IMAGE-'].Widget.bind(
         "<B1-Motion>", lambda event: on_image_left_motion(
             event, main_image_ndarray, '-MAIN IMAGE-', scale_percent))
@@ -505,44 +556,46 @@ def binds_all():
         lambda event: on_image_right_click(event, sliced_prediction))
     images_window['-GC-'].Widget.bind(
         "<Button-3>", lambda event: on_image_right_click(event, sliced_mask))
+    images_window['-NP-'].Widget.bind(
+        "<Button-3>", lambda event: on_image_right_click(event, sliced_noise_prediction))    
 
     # Opposite draw on the others
     images_window['-GT-'].Widget.bind(
         "<ButtonRelease-1>",
         lambda event: on_image_left_release(event, [
             sliced_signal_s, sliced_target_s, sliced_prediction_s,
-            sliced_mask_s
-        ], ['-BF-', '-GT-', '-PR-', '-GC-'], 1))
+            sliced_mask_s,sliced_noise_prediction_s
+        ], ['-BF-', '-GT-', '-PR-', '-GC-','-NP-'], 1))
     images_window['-BF-'].Widget.bind(
         "<ButtonRelease-1>",
         lambda event: on_image_left_release(event, [
             sliced_signal_s, sliced_target_s, sliced_prediction_s,
-            sliced_mask_s
-        ], ['-BF-', '-GT-', '-PR-', '-GC-'], 1))
+            sliced_mask_s,sliced_noise_prediction_s
+        ], ['-BF-', '-GT-', '-PR-', '-GC-','-NP-'], 1))
     images_window['-PR-'].Widget.bind(
         "<ButtonRelease-1>",
         lambda event: on_image_left_release(event, [
             sliced_signal_s, sliced_target_s, sliced_prediction_s,
-            sliced_mask_s
-        ], ['-BF-', '-GT-', '-PR-', '-GC-'], 1))
+            sliced_mask_s, sliced_noise_prediction_s
+        ], ['-BF-', '-GT-', '-PR-', '-GC-','-NP-'], 1))
     images_window['-GC-'].Widget.bind(
         "<ButtonRelease-1>",
         lambda event: on_image_left_release(event, [
             sliced_signal_s, sliced_target_s, sliced_prediction_s,
-            sliced_mask_s
-        ], ['-BF-', '-GT-', '-PR-', '-GC-'], 1))
+            sliced_mask_s, sliced_noise_prediction_s
+        ], ['-BF-', '-GT-', '-PR-', '-GC-','-NP-'], 1))
     images_window['-MAIN IMAGE-'].Widget.bind(
         "<ButtonRelease-1>",
         lambda event: on_image_left_release(event, [
             sliced_signal_s, sliced_target_s, sliced_prediction_s,
-            sliced_mask_s
-        ], ['-BF-', '-GT-', '-PR-', '-GC-'], scale_percent))
+            sliced_mask_s, sliced_noise_prediction_s
+        ], ['-BF-', '-GT-', '-PR-', '-GC-','-NP-'], scale_percent))
 
 def show_image(image_ndarray, key, window=images_window):
     if (window is None):
         window = images_window
     if (image_ndarray is not None):
-        if (len(image_ndarray.shape) == 2):  # not for mask
+        if (len(image_ndarray.shape) == 2) or (image_ndarray.shape[2] == 1):  # not for mask
             cv_image = np.uint8(
                 np.dstack([image_ndarray, image_ndarray, image_ndarray]) * 255)
         else:
@@ -669,6 +722,7 @@ def redraw_roi():
             add_circle(sliced_target_s, (start_x, start_y), '-GT-')
             add_circle(sliced_prediction_s, (start_x, start_y), '-PR-')
             add_circle(sliced_mask_s, (start_x, start_y), '-GC-')
+            add_circle(sliced_noise_prediction_s, (start_x, start_y), '-NP-')
     elif (roi_mode == "subset"):
         if (start_x is not None and start_y is not None and end_x is not None
                 and end_y is not None):
@@ -679,6 +733,7 @@ def redraw_roi():
             add_rect(sliced_prediction_s, (start_x, start_y), (end_x, end_y),
                      '-PR-')
             add_rect(sliced_mask_s, (start_x, start_y), (end_x, end_y), '-GC-')
+            add_rect(sliced_noise_prediction_s, (start_x, start_y), (end_x, end_y), '-NP-')
 
 # Display and interact with the Window using an Event Loop
 while True:
@@ -751,6 +806,8 @@ while True:
             mask = None
             if (images_window is not None):
                 images_window.close()
+                
+            main_window['Evaluate interperters'].update(disabled=False)
     
     elif event == 'Plot pearson score by slice':
         scores = get_pearson_per_slice(prediction,target)
@@ -871,10 +928,13 @@ while True:
                          images_window.ReturnValuesDictionary['-MEM CHECK-'])
 
                 main_window['-ROI TEXT-'].update('')
+                main_window['Noise prediction'].update(disabled=True)
+                
                 if (roi_mode == "full"):
                     main_window['Calculate'].update(disabled=False)
                 else:
                     main_window['Calculate'].update(disabled=True)
+                    
 
     elif (event == '-LAYERS-'):
         if (main_window.ReturnValuesDictionary['-LAYERS-'] != '' and
@@ -902,9 +962,11 @@ while True:
         if main_window.ReturnValuesDictionary['-RADIO SM-']:
             method="saliency"
             interperter = Saliency(unet_model)
+            history_key = "{}-{}-{}-{}".format(method,image_index,roi_mode, str(roi_args))
         elif main_window.ReturnValuesDictionary['-RADIO GBP-']:
             method="gbp"
             interperter = GuidedBackprop(unet_model)
+            history_key = "{}-{}-{}-{}".format(method,image_index,roi_mode, str(roi_args))
         elif main_window.ReturnValuesDictionary['-RADIO GC-']:
             X_gradcam = main_window.ReturnValuesDictionary['-X gradcam-']
             if X_gradcam:
@@ -912,27 +974,46 @@ while True:
             else:
                 method = "gradcam"
             interperter = GradCam(model=unet_model,
-                    target_layer_names=selected_layer,
+                    target_layer=selected_layer,
                     X_gradcam=X_gradcam)
-        # else:
+            
+            history_key = "{}-{}-{}-{}-{}".format(method,image_index, values['-LAYERS-'],roi_mode, str(roi_args))
+        elif main_window.ReturnValuesDictionary['-RADIO MI-']:
+            method="mask_interperter"
+            interperter = MaskInterperter(model=mg_model)
+            history_key = "{}-{}-{}-{}".format(method,image_index,roi_mode, str(roi_args))
 
         mask, mask_norm = get_mask(interperter, signal, roi_mode, roi_args)
 
-        save_mask(gv.mg_model_path, mask_norm, selected_layer.name, roi_mode, roi_args, method)        
+        save_mask(gv.mg_model_path, mask_norm, selected_layer.name, roi_mode, roi_args, method)     
+        
+        noise_prediction = None
+        noise_prediction_mm = None   
 
         show_all(images_window.ReturnValuesDictionary['-NUC CHECK-'],
                  images_window.ReturnValuesDictionary['-MEM CHECK-'])
         redraw_roi()
+        
+        main_window['Noise prediction'].update(disabled=False)
 
-        history_key = "{}-{}-{}-{}".format(image_index, values['-LAYERS-'],
-                                           roi_mode, str(roi_args))
         history_image = mask.copy()
         if (roi_args is not None):
             history_roi_args = roi_args.copy()
         else:
             history_roi_args = None
         history_roi_mode = roi_mode
-
+        
+    elif (event == 'Noise prediction'):
+        mask_th = float(main_window.ReturnValuesDictionary['-NP TH-'])
+        noise_prediction = get_noise_prediction(signal,mask_norm, mask_th, unet_model, roi_mode, roi_args)
+        noise_prediction_mm = noise_prediction
+        show_all(images_window.ReturnValuesDictionary['-NUC CHECK-'],images_window.ReturnValuesDictionary['-MEM CHECK-'])
+        redraw_roi()
+    
+    elif (event == 'Evaluate interperters'):
+        X_gradcam = main_window.ReturnValuesDictionary['-X gradcam-']
+        evaluate_interperters(gv.mg_model_path,dataset,unet_model,mg_model,selected_layer,X_gradcam)    
+        
     elif (event == 'Show History'):
         if (images_window.ReturnValuesDictionary['-HISTORY-'] != '' and
                 images_window.ReturnValuesDictionary['-HISTORY-'] is not None):

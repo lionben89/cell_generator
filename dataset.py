@@ -163,7 +163,9 @@ class DataGen(keras.utils.Sequence):
 
     def fill_samples(self, i):
         j = 0
-        while j < self.batch_size:
+        count = 0
+        while j < self.batch_size and count<30:
+            count += 1
             image_index = None
             try:
                 if self.image_number is None:
@@ -408,8 +410,13 @@ class DataGen(keras.utils.Sequence):
                             label = self.df.get_item(image_index, 'label')
                             self.labels_buffer[i*self.batch_size+j * self.patches_from_image] = label
                 j+=1
-            except:
-                print("could not load image {} , trying another one.\n".format(image_index))
+                count = 0
+            except Exception as e:
+                try:
+                    print("could not load image {} , trying another one.\n".format(image_path))
+                    print(str(e))
+                except:
+                    print(str(e))
 
             # if (old_image_path != image_path):
             #     os.remove(image_path)

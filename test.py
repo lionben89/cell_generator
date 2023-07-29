@@ -18,9 +18,9 @@ from skimage.filters import threshold_li
 gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
 predictors=None #True w_dna
-gv.unet_model_path = "./unet_model_22_05_22_actin_128" #_48_64_64"#"unet_model_22_05_22_actin_128" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
+gv.unet_model_path = "./unet_model_22_05_22_bundles_128" #_48_64_64"#"unet_model_22_05_22_actin_128" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Actin-filaments" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Actomyosin-bundles" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -231,8 +231,8 @@ elif (gv.model_type == "CLF"):
         clf.evaluate(dataset)
         
 elif (gv.model_type == "UNET"):
-    images = [1]
-    # images = range(test_dataset.df.get_shape()[0])
+    # images = [1]
+    images = range(test_dataset.df.get_shape()[0])
     unet = keras.models.load_model(gv.unet_model_path)
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
         os.makedirs("{}/predictions".format(gv.unet_model_path))
@@ -244,7 +244,7 @@ elif (gv.model_type == "UNET"):
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col,0)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col,0)
-        nuc_seg, nuc_seg_new_file_path = test_dataset.get_image_from_ssd(image_path,"dna_seg",0)
+        # nuc_seg, nuc_seg_new_file_path = test_dataset.get_image_from_ssd(image_path,"dna_seg",0)
         pred_image, prediction_new_file_path = test_dataset.get_image_from_ssd(image_path, "prediction", 0)
         
         if (input_image is None or target_image is None or pred_image is None):
@@ -257,13 +257,13 @@ elif (gv.model_type == "UNET"):
             target_image = ImageUtils.get_channel(image_ndarray,channel_index)
             channel_index = int(test_dataset.df.get_item(image_index, "channel_dna"))
             pred_image = ImageUtils.get_channel(image_ndarray, channel_index)
-            channel_index = int(test_dataset.df.get_item(image_index, "dna_seg"))
-            nuc_seg = ImageUtils.get_channel(image_ndarray, channel_index)
+            # channel_index = int(test_dataset.df.get_item(image_index, "dna_seg"))
+            # nuc_seg = ImageUtils.get_channel(image_ndarray, channel_index)
             
             input_image = np.expand_dims(input_image[0], axis=-1)
             target_image = np.expand_dims(target_image[0], axis=-1)
             pred_image = np.expand_dims(pred_image[0], axis=-1)
-            nuc_seg = np.expand_dims(nuc_seg[0], axis=-1)
+            # nuc_seg = np.expand_dims(nuc_seg[0], axis=-1)
             
             if norm_type == "minmax":
                 target_image = normalize(target_image,max_value=1.0,dtype=np.float32)
@@ -317,12 +317,12 @@ elif (gv.model_type == "UNET"):
         prediction_cut = (prediction/(d))[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         target_cut = (target_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         input_cut = (input_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
-        nuc_seg_cut = (nuc_seg)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
+        # nuc_seg_cut = (nuc_seg)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         
         ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
         ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
         ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(nuc_seg_cut.astype(np.float16),"{}/predictions/{}/nuc_seg_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        # ImageUtils.imsave(nuc_seg_cut.astype(np.float16),"{}/predictions/{}/nuc_seg_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
         p=pearson_corr(target_cut, prediction_cut)
         pcc+=p
         print("pearson corr for image:{} is :{}".format(image_index,p))

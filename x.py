@@ -7,9 +7,9 @@ for i in [0,1,2,3,4,5]:
     index=i
     print(index)
     # unet_model_path = "/sise/home/lionb/unet_model_22_05_22_membrane_128"
-    unet_model_path = "/sise/home/lionb/unet_model_22_05_22_actin_128"
-    image1_path = "{}/predictions/{}/target_patch_{}.tiff".format(unet_model_path,index,index)
-    image2_path = "{}/predictions/{}/prediction_patch_{}.tiff".format(unet_model_path,index,index)
+    unet_model_path = "/sise/home/lionb/mg_model_ne_10_06_22_5_0_new" #"/sise/home/lionb/unet_model_22_05_22_ne_128"
+    image1_path = "{}/predictions/{}/target_{}.tiff".format(unet_model_path,index,index)
+    image2_path = "{}/predictions/{}/unet_prediction_{}.tiff".format(unet_model_path,index,index)
 
     from cell_imaging_utils.image.image_utils import ImageUtils
 

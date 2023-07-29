@@ -19,12 +19,12 @@ from models.ZeroGenerator import ZeroGenerator
 # CONTINUE_TRAINING = False
 CONTINUE_TRAINING = True ## False to override current model with the same name
 
-gv.model_type = "UNET"
+gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
-gv.unet_model_path = "./unet_model_22_05_22_ne_48_64_64" ## UNET model if in MG mode it is the model that we want to interpret
-gv.mg_model_path = "mg_model_ne_10_06_22_5_0_new_weighted_pcc_1000_0_1"
+gv.unet_model_path = "./unet_model_22_05_22_bundles_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.mg_model_path = "mg_model_bundles_10_06_22_5_0_mlw_0.1"
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Actomyosin-bundles" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -37,7 +37,7 @@ else:
 gv.batch_size = 4 #4
 noise_scale = 5.0
 norm_type = "std"
-gv.patch_size = (48,64,64,1)
+gv.patch_size = (32,128,128,1)
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
@@ -292,10 +292,10 @@ elif (gv.model_type == "MG"):
     
     #Uncomment below for modified pearson
     # dilate =False for regular pearson, True for modified
-    weighted_pcc = True
-    gv.target = "structure_seg"
-    train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, dilate=True) 
-    validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf, dilate=True)
+    # weighted_pcc = True
+    # gv.target = "structure_seg"
+    # train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, dilate=True) 
+    # validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf, dilate=True)
     
     unet = keras.models.load_model(gv.unet_model_path)
     unet.summary()
@@ -306,7 +306,7 @@ elif (gv.model_type == "MG"):
     adaptor = get_unet((*gv.patch_size[:-1],64),activation="sigmoid") 
     adaptor.summary()
     
-    mg = MaskGenerator(gv.patch_size, adaptor, unet, weighted_pcc=weighted_pcc,pcc_target=0.95)
+    mg = MaskGenerator(gv.patch_size, adaptor, unet, weighted_pcc=weighted_pcc,pcc_target=0.90)
     mg.unet.trainable = False
     
     
@@ -318,14 +318,14 @@ elif (gv.model_type == "MG"):
     
     
     mask_loss_weight=0.1
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.92)
-    for i in range(2):
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
+    for i in range(1):
         print("mask_loss_weight: ",mask_loss_weight)
         print("noise_scale: ",noise_scale)
         early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_stop")
-        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,mask_size_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
+        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.00001),mask_loss_weight=mask_loss_weight,mask_size_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
         mg.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
-        mask_loss_weight = mask_loss_weight+0.01
+        # mask_loss_weight = mask_loss_weight+0.01
         
     mg.save(gv.mg_model_path,save_format="tf")
         

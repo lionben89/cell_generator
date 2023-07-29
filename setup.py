@@ -8,9 +8,10 @@ with open("README.md", "r") as fh:
 requirements = [
     "matplotlib",
     "numpy==1.20.3",
-    "tifffile",
-    "scikit-image>=0.15.0",
+    "tifffile==0.15.1",
+    "scikit-image==0.16.2",
     "aicsimageio==3.0.7",
+    # "aicssegmentation",
     "quilt3",
     "bumpversion",
     "twine",

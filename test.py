@@ -18,9 +18,10 @@ from skimage.filters import threshold_li
 gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
 predictors=None #True w_dna
-gv.unet_model_path = "./unet_model_24_04_23_tight_junction_sarit" #"./unet_model_16_04_23_actomyosin_bundles_sarit" #_48_64_64"#"unet_model_22_05_22_actin_128" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
+gv.unet_model_path = "./unet_model_22_05_22_dna_128b" #_48_64_64"#"unet_model_22_05_22_actin_128" #unet_model_22_05_22_membrane_w_dna "./unet_model_22_05_22_membrane_128" #"./unet_model_22_05_22_actin_128p_save_bs4-1"
+gv.target = "channel_dna"
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Tight-junctions" #"Actomyosin-bundles" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -28,19 +29,27 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    gv.train_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+    gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle.replace(' ','-'))
+    gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle.replace(' ','-'))
 norm_type = "std" #"minmax"#"std"#
 # gv.patch_size = (48,64,64,1)
 gv.patch_size = (32,128,128,1)
-
-compound = None #"staurosporine" #None #"rapamycin" #"paclitaxol" #"blebbistatin" #None #"staurosporine"
+compound = None #"Staurosporine" #"Staurosporine" #"Paclitaxol" 
+is_vehicle = False #"staurosporine" #None #"rapamycin" #"paclitaxol" #"blebbistatin" #None #"staurosporine"
 if compound is not None:
-    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}_{}/image_list_test.csv".format(gv.organelle,compound)
+    if is_vehicle:
+        ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,"Vehicle")
+    else:
+        ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,compound)
 else:
-    ds_path = gv.train_ds_path
+    ds_path = gv.test_ds_path
     
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
+
+print("Model: ",gv.unet_model_path)
+print("Organelle: ",gv.organelle)
+print("Compound: ",compound)
+print("Vehicle: ", is_vehicle)
 
 def _get_weights(shape):
     shape_in = shape
@@ -232,9 +241,8 @@ elif (gv.model_type == "CLF"):
         
 elif (gv.model_type == "UNET"):
     # images = [1]
-    images = range(test_dataset.df.get_shape()[0])
-    unet = keras.models.load_model(gv.unet_model_path) 
-    
+    images = range(min(10,test_dataset.df.get_shape()[0]))
+    unet = keras.models.load_model(gv.unet_model_path)
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
         os.makedirs("{}/predictions".format(gv.unet_model_path))
     pcc = 0
@@ -243,10 +251,10 @@ elif (gv.model_type == "UNET"):
         if (not os.path.exists("{}/predictions/{}".format(gv.unet_model_path,image_index))):
             os.makedirs("{}/predictions/{}".format(gv.unet_model_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
-        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col,0)
-        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col,0)
-        # nuc_seg, nuc_seg_new_file_path = test_dataset.get_image_from_ssd(image_path,"dna_seg",0)
-        pred_image, prediction_new_file_path = test_dataset.get_image_from_ssd(image_path, "prediction", 0)
+        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
+        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
+        # nuc_seg, nuc_seg_new_file_path = test_dataset.get_image_from_ssd(image_path,"dna_seg")
+        pred_image, prediction_new_file_path = test_dataset.get_image_from_ssd(image_path, "prediction")
         
         if (input_image is None or target_image is None or pred_image is None):
 
@@ -381,13 +389,13 @@ elif (gv.model_type == "ShG"):
         # image_index = 1
         print("predicting: ",image_index)
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
-        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col,0)
-        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col,0)
+        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
+        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
         
         alt_image_index = image_index#int(np.random.random_integers(0,test_dataset.df.get_shape()[0]-1))
         alt_image_path = test_dataset.df.get_item(alt_image_index,'path_tiff')
-        alt_input_image, alt_input_new_file_path = test_dataset.get_image_from_ssd(alt_image_path,test_dataset.input_col,0)
-        alt_target_image, alt_target_new_file_path = test_dataset.get_image_from_ssd(alt_image_path,test_dataset.target_col,0)
+        alt_input_image, alt_input_new_file_path = test_dataset.get_image_from_ssd(alt_image_path,test_dataset.input_col)
+        alt_target_image, alt_target_new_file_path = test_dataset.get_image_from_ssd(alt_image_path,test_dataset.target_col)
         if (input_image is None or target_image is None):
 
             image_ndarray = None
@@ -617,8 +625,8 @@ elif (gv.model_type == "MG"):
         if (not os.path.exists("{}/{}/{}".format(gv.mg_model_path,dir_path,image_index))):
             os.makedirs("{}/{}/{}".format(gv.mg_model_path,dir_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
-        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col,0)
-        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col,0)
+        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
+        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
         seg_image = None
         nuc_image = None
         ths = [-0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9] #[0.0]#[1.00,0.0,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]

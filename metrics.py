@@ -51,9 +51,9 @@ def pearson_corr(a,b,weights=None):
             else:
                 cc = cc + t_weights[i]
     else:
-        a_i = np.argwhere(a != 1e-4)
-        a_new = a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
-        b_new = b[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
+        # a_i = np.argwhere(a != 1e-4)
+        a_new = a #a[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
+        b_new = b #b[a_i[:,0],a_i[:,1],a_i[:,2],a_i[:,3]]
         cc = pearson_corr_aux(a_new,b_new)
     return cc
                 

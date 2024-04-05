@@ -10,6 +10,7 @@ from models.MaskGenerator import MaskGenerator
 from models.RegCNN import RegCNN, get_reg
 from models.ShuffleGenerator import ShuffleGenerator
 from models.ZeroGenerator import ZeroGenerator
+import pandas as pd
 
 # tf.config.run_functions_eagerly(True)
 # from tensorflow.keras import mixed_precision
@@ -21,10 +22,13 @@ CONTINUE_TRAINING = True ## False to override current model with the same name
 
 gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
-gv.unet_model_path = "./unet_model_22_05_22_bundles_128" ## UNET model if in MG mode it is the model that we want to interpret
-gv.mg_model_path = "mg_model_bundles_10_06_22_5_0_mlw_0.1"
+gv.unet_model_path = "./unet_model_22_05_22_dna_128b" ## UNET model if in MG mode it is the model that we want to interpret
+gv.target = "channel_dna"
+gv.mg_model_path = "./mg_model_dna_10_06_22_5_0_dnab3"
+mask_loss_weight=0.1
 gv.clf_model_path = "./clf_model_14_12_22-1"
-gv.organelle = "Actomyosin-bundles" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "DNA" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 if gv.model_type == "CLF":
     gv.input = "channel_target"
@@ -39,9 +43,16 @@ noise_scale = 5.0
 norm_type = "std"
 gv.patch_size = (32,128,128,1)
 
+compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
+drug = compound #"Vehicle"
+if compound is not None:
+    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug)
+else:
+    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
-train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
-validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 4, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None) #,predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet})
+train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None) #predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
+validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None) #,predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet})
 
 
 # (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
@@ -306,28 +317,28 @@ elif (gv.model_type == "MG"):
     adaptor = get_unet((*gv.patch_size[:-1],64),activation="sigmoid") 
     adaptor.summary()
     
-    mg = MaskGenerator(gv.patch_size, adaptor, unet, weighted_pcc=weighted_pcc,pcc_target=0.90)
+    mg = MaskGenerator(gv.patch_size, adaptor, unet, weighted_pcc=weighted_pcc,pcc_target=0.95)
     mg.unet.trainable = False
     
-    
-    
-    # checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.92)
     if CONTINUE_TRAINING and os.path.exists(gv.mg_model_path):
         mg_pt = keras.models.load_model(gv.mg_model_path)
         mg.set_weights(mg_pt.get_weights())
     
     
-    mask_loss_weight=0.1
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
+    
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),mg,gv.mg_model_path,monitor="val_stop",term="val_pcc",term_value=0.9)
     for i in range(1):
         print("mask_loss_weight: ",mask_loss_weight)
         print("noise_scale: ",noise_scale)
         early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_stop")
-        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.00001),mask_loss_weight=mask_loss_weight,mask_size_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
-        mg.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
+        mg.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,mask_size_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
+        losses = mg.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
+
         # mask_loss_weight = mask_loss_weight+0.01
         
     mg.save(gv.mg_model_path,save_format="tf")
+    a = pd.DataFrame(losses.history)
+    a.to_csv("{}/losses.csv".format(gv.mg_model_path))
         
 elif (gv.model_type == "EAM"): #Explainable Adverserial Model
     from models.EAM import *

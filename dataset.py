@@ -148,10 +148,10 @@ class DataGen(keras.utils.Sequence):
 
         self.fill_buffer()
 
-    def get_image_from_ssd(self, file_path, prefix, k):
+    def get_image_from_ssd(self, file_path, prefix):
         file_name = file_path.split('/')[-1]
-        new_file_path = "{}/{}_{}_{}".format(
-            self.new_path_origin, prefix, k, file_name)
+        new_file_path = "{}/{}_{}".format(
+            self.new_path_origin, prefix, file_name)
         if os.path.exists(new_file_path):
             image_ndarray = ImageUtils.image_to_ndarray(
                 ImageUtils.imread(new_file_path))
@@ -171,7 +171,7 @@ class DataGen(keras.utils.Sequence):
                 if self.image_number is None:
                     image_index = np.random.randint(
                         int(self.n*self.min_precentage), int(self.n*self.max_precentage))
-                    # print("adding image {} to buffer\n".format(image_index))
+                    print("adding image {} to buffer\n".format(image_index))
                 else:
                     image_index = self.image_number
 
@@ -183,15 +183,23 @@ class DataGen(keras.utils.Sequence):
                     k = 0
 
                 input_image, new_input_path = self.get_image_from_ssd(
-                    image_path, self.input_col, k)
+                    image_path, self.input_col)
+                if (self.augment and input_image is not None):
+                    print(input_image.shape)
+                    input_image = np.rot90(input_image, axes=(2, 3), k=k)
+                    
                 if not self.for_clf:
                     target_image, new_target_path = self.get_image_from_ssd(
-                        image_path, self.target_col, k)
+                        image_path, self.target_col)
+                    if (self.augment and target_image is not None):
+                        target_image = np.rot90(target_image, axes=(2, 3), k=k)
                 if self.predictors is not None:
                     pred_image, new_prediction_path = self.get_image_from_ssd(
-                        image_path, "prediction", k)
+                        image_path, "prediction")
+                    if (self.augment and pred_image is not None):
+                        pred_image = np.rot90(pred_image, axes=(2, 3), k=k)
 
-                if (input_image is None or (target_image is None and not self.for_clf)):
+                if (True or input_image is None or (target_image is None and not self.for_clf)):
                     image_ndarray = ImageUtils.image_to_ndarray(
                         ImageUtils.imread(image_path))
                     image_ndarray = image_ndarray.astype(np.float64)
@@ -283,9 +291,9 @@ class DataGen(keras.utils.Sequence):
                         target_image = np.clip(target_image, 0, 1)
                     input_image = np.expand_dims(input_image[0], axis=-1)
                     target_image = np.expand_dims(target_image[0], axis=-1)
-                    ImageUtils.imsave(input_image, new_input_path)
-                    if not self.for_clf:
-                        ImageUtils.imsave(target_image, new_target_path)
+                    # ImageUtils.imsave(input_image, new_input_path)
+                    # if not self.for_clf:
+                    #     ImageUtils.imsave(target_image, new_target_path)
 
                 if self.pairs:
                     input_image = ImageUtils.to_shape(input_image, self.patch_size)
@@ -399,7 +407,7 @@ class DataGen(keras.utils.Sequence):
                                             pred_image = np.expand_dims(pred_image[0], axis=-1)
                                         else:
                                             pred_image = normalize(pred_image, max_value=1.0, dtype=np.float32)                                    
-                                    ImageUtils.imsave(pred_image, new_prediction_path)
+                                    # ImageUtils.imsave(pred_image, new_prediction_path)
                                     self.pred_buffer[i*self.batch_size+j *self.patches_from_image] = pred_image
 
                         self.input_buffer[i*self.batch_size+j *

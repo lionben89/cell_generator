@@ -12,9 +12,9 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 gv.patch_size = (32,128,128,1)
-gv.unet_model_path = "/sise/home/lionb/unet_model_22_05_22_mito_128"
-gv.mg_model_path = "/sise/home/lionb/mg_model_mito_10_06_22_5_0_new"
-gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.unet_model_path = "/sise/home/lionb/unet_model_22_05_22_ne_128"
+gv.mg_model_path = "/sise/home/lionb/mg_model_ne_10_06_22_5_0_new"
+gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 upper_layout = [

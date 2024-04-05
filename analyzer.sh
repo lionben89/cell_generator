@@ -5,7 +5,7 @@
 #SBATCH --output my_job-id-%J.out                ### output log for running job - %J for job number
 ##SBATCH --mail-user=gilba@post.bgu.ac.il      ### users email for sending job status
 ##SBATCH --mail-type=BEGIN,END,FAIL             ### conditions when to send the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-#SBATCH  --gpus=rtx_3090:1                ### number of GPUs (can't exceed 8 gpus for now) ask for more than 1 only if you can parallelize your code for multi GPU
+#SBATCH  --gpus=1 ###rtx_3090:1                ### number of GPUs (can't exceed 8 gpus for now) ask for more than 1 only if you can parallelize your code for multi GPU
 ##SBATCH --exclude=dt-gpu-03,dt-gpu-04,dt-1080-01
 #SBATCH --mem=32G
 #SBATCH --tmp=200G             ### Asks to allocate enough space on /scratch

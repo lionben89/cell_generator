@@ -105,6 +105,8 @@ class MaskGenerator(keras.Model):
         
         with tf.GradientTape() as tape:
             mask = self.generator([data_0,unet_target])
+            # mask = self.generator([data_0,data_0])
+            
             # mask = tf.cast(tf.where(mask>0.5,1.0,mask),dtype=tf.float64)
             # mask = self.generator(data_0)
                     
@@ -175,7 +177,7 @@ class MaskGenerator(keras.Model):
                 pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
             # inv_pcc_loss = tf.math.abs(tf_pearson_corr(unet_target,inv_unet_predictions))
             
-            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1000 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
+            total_loss = 0.1*unet_loss + (mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1500 #+ inv_pcc_loss*1000 #+ mask_size_loss*self.mask_size_loss_weight
             
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)

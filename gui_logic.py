@@ -20,8 +20,8 @@ import pandas as pd
 
 root_dir = "/sise/home/lionb/"
 
-xy_step = 128
-z_step = 32
+xy_step = 64
+z_step = 16
 
 def get_roi(roi_mode, roi_args, signal):
     if roi_args == None:

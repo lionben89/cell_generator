@@ -1,6 +1,7 @@
 import pandas as pd
 import networkx as nx
 from networkx.algorithms import community
+import os
 
 def insert_csv_to_graph(csv_file):
     # Read the CSV file
@@ -33,17 +34,22 @@ def insert_csv_to_graph(csv_file):
         
     # Add location_in_cell metadata to all nodes
     for node in graph.nodes:
-        location_in_cell = df.loc[df['source'] == node, 'location_in_cell'].values[0]
-        graph.nodes[node]['location_in_cell'] = location_in_cell
+        location_in_cell = df.loc[df['source'] == node, 'location_in_cell'].values
+        if len(location_in_cell) > 0:
+            graph.nodes[node]['location_in_cell'] = location_in_cell[0]
     
     return graph
 
-# Path to the CSV file
-csv_file = '/sise/home/lionb/predictions_correlations_constant_main_organelle_precent_pixels_0.001_in_image.csv'
+drugs = ["s-Nitro-Blebbistatin","Rapamycin","Paclitaxol","Staurosporine","Brefeldin",None]
 
-# Insert the CSV data into a NetworkX graph
-graph = insert_csv_to_graph(csv_file)
+for drug in drugs:
+    for v in [None,"Vehicle"]:
+        # Path to the CSV file
+        csv_file = "/sise/home/lionb/predictions_correlations_constant_{}_{}_main_organelle_precent_pixels_0.001_in_image.csv".format(drug,v)
+        if os.path.exists(csv_file):
+            # Insert the CSV data into a NetworkX graph
+            graph = insert_csv_to_graph(csv_file)
 
-# Save the graph as a GEXF file
-output_file = '/sise/home/lionb/correlations_graph.gexf'
-nx.write_gexf(graph, output_file)
+            # Save the graph as a GEXF file
+            output_file = "/sise/home/lionb/correlations_graph_{}_{}.gexf".format(drug,v)
+            nx.write_gexf(graph, output_file)

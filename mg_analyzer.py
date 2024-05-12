@@ -28,9 +28,9 @@ z_step = 16
 batch_size = 4
 noise_scale = 5.0
 
-def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
+def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(2),weighted_pcc=False):
     
-    batch_size=1
+    batch_size=4
     
     ##Load model
     if model is None:
@@ -40,7 +40,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
     ## Create noise vars
     noise_start = 0.0
     noise_step = 0.5
-    noise_stop = 6.0
+    noise_stop = 1.5
     noises = np.arange(noise_start,noise_stop,noise_step)
         
     dir_path = "{}".format(model_path)
@@ -102,6 +102,9 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
         ## Back to image 
         unet_p,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,np.ones_like(input_patchs)],weights,input_image.shape,gv.patch_size,xy_step,z_step)
         
+        pcc_gt = pearson_corr((target_image), (unet_p/d),target_seg_image_dilated)
+        print("pearson with gt corr for image:{} is :{}".format(image_index,pcc_gt))
+        
         del unet_patchs_p
         
         for noise_scale in noises:
@@ -116,16 +119,21 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
             ## Back to image 
             input_p,unet_noise_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p],weights,input_image.shape,gv.patch_size,xy_step,z_step)
             
-            pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:],target_seg_image_dilated)
+            pcc = pearson_corr((unet_p/d), (unet_noise_p/d),target_seg_image_dilated)
             
             pccs.append(pcc)
-            print("pearson corr for image:{} is :{}".format(image_index,pcc))
-                       
+            print("pearson corr for image:{} with noise std:{}, is :{}".format(image_index,noise_scale,pcc))
+            
+            del input_patchs_p      
             del unet_noise_patchs_p
             del input_p
             del unet_noise_p
+            del normal_noise
             
         pcc_results.add_row(pccs)
+        
+        del input_patchs
+        
     pcc_results.create()
 
 def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None):

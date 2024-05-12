@@ -144,6 +144,6 @@ def predict(model,data,batch_size_t,patch_size):
         return output
     except:
        if batch_size_t > 2:
-           return predict(model,data,batch_size_t-1) 
+           return predict(model,data,batch_size_t-1,patch_size) 
        else:
            raise("predict fail")

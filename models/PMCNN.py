@@ -3,6 +3,7 @@ import tensorflow.keras as keras
 import numpy as np
 import global_vars as gv
 
+"""Pair Matching CNN"""
 def get_pm(input_size,name="pair_matching"):
         
         if (input_size[0]==1): ## 2D image
@@ -46,57 +47,3 @@ def get_pm(input_size,name="pair_matching"):
         output = keras.layers.Dense(1,activation="sigmoid",dtype=tf.float32,name="{}_denseout".format(name))(x)
         
         return keras.Model([bf_input,prediction_input],output,name=name)  
-
-# class PMCNN(keras.Model):
-#     def __init__(self, pm, **kwargs):
-#         super(PMCNN, self).__init__(**kwargs)
-
-#         self.pm = pm
-        
-#         self.loss_tracker = keras.metrics.Mean(
-#             name="loss"
-#         )
-#         self.acc = keras.metrics.BinaryAccuracy(
-#             name="acc"
-#         )
-    
-#     @property
-#     def metrics(self):
-#         return [
-#             self.loss_tracker,
-#             self.acc,
-#         ]
-
-#     def train_step(self, data, train=True):
-      
-#         # Train regressor
-#         with tf.GradientTape() as tape:
-#             data_1 = tf.cast(data[1],dtype=tf.float32)
-#             input_rev = tf.experimental.numpy.flip(data[0],axis=0)
-#             target_shuffled = tf.random.shuffle(data_1)
-#             input_shuffled = tf.random.shuffle(data[0])
-#             pos_match_score = self.pm([data[0],data_1])
-#             neg_match_score_a = self.pm([input_rev,data_1])
-#             neg_match_score_b = self.pm([input_shuffled,target_shuffled])
-#             target_score = tf.concat([tf.zeros_like(neg_match_score_a),tf.ones_like(pos_match_score),tf.zeros_like(neg_match_score_b)],axis=0)
-#             prediction_score = tf.concat([neg_match_score_a,pos_match_score,neg_match_score_b],axis=0)
-            
-#             loss = keras.losses.binary_crossentropy(target_score, prediction_score)
-
-#         if (train):
-#             grads = tape.gradient(loss, self.pm.trainable_weights)
-#             self.optimizer.apply_gradients(zip(grads, self.pm.trainable_weights))
-        
-#         self.loss_tracker.update_state(loss)
-#         self.acc.update_state(target_score,prediction_score)
-#         return {
-#             "loss": self.loss_tracker.result(),
-#             "accuracy": self.acc.result(),
-#         }
-        
-#     def test_step(self, data):
-#         return self.train_step(data,False)    
-    
-#     def call(self,input):
-#         return self.pm(input)
-        

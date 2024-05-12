@@ -3,7 +3,7 @@ import tensorflow.keras as keras
 import numpy as np
 import global_vars as gv
 
-
+"""Original In-silico labeling UNET with MSE"""
 def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
         
         if (input_size[0]==1): ## 2D image

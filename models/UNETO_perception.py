@@ -4,6 +4,7 @@ import numpy as np
 import global_vars as gv
 from tensorflow.keras.applications import vgg19
 
+"""Unet with perception loss"""
 def get_unet(input_size,activation="relu",regularizer=None,name="unet"):
         
         if (input_size[0]==1): ## 2D image

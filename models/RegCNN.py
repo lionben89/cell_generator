@@ -3,7 +3,7 @@ import tensorflow.keras as keras
 import numpy as np
 import global_vars as gv
 
-
+"""Model to predicte the PCC score from the input and the prediction"""
 def get_reg(input_size,name="regressor"):
         
         if (input_size[0]==1): ## 2D image

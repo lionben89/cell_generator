@@ -2,6 +2,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 
+"""Auto Encoder"""
 def get_encoder(input_size,name="encoder"):
         
         if (input_size[0]==1): ## 2D image

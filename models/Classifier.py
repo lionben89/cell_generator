@@ -3,7 +3,7 @@ import tensorflow.keras as keras
 import numpy as np
 import global_vars as gv
 
-
+"""Simple Classifier"""
 def get_clf(input_size, num_classes ,name="classifier"):
         
         if (input_size[0]==1): ## 2D image

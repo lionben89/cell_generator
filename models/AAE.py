@@ -3,6 +3,7 @@ import tensorflow.keras as keras
 import numpy as np
 import global_vars as gv
 
+"""Adverserial Auto Encoder"""
 def shuffle(x,y):
     indices = tf.range(start=0, limit=tf.shape(x)[0], dtype=tf.int32)
     shuffled_indices = tf.random.shuffle(indices)

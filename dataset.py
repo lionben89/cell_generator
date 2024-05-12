@@ -11,71 +11,72 @@ import sklearn as sklearn
 import cv2
 from patchify import patchify
 
-def normalize(image_ndarray,max_value=255,dtype=np.uint8) -> np.ndarray:
-    image_ndarray = image_ndarray.astype(np.float64)
-    max_var = np.max(image_ndarray!=np.inf)
-    image_ndarray = np.where(image_ndarray==np.inf,max_var,image_ndarray)
-    temp_image = image_ndarray-np.min(image_ndarray)
-    return ((temp_image)/((np.max(temp_image))*max_value)).astype(dtype)
-
-def slice_image(image_ndarray: np.ndarray, indexes: list) -> np.ndarray:
-    n_dim = len(image_ndarray.shape)
-    slices = [slice(None)] * n_dim
-    for i in range(len(indexes)):
-        slices[i] = slice(indexes[i][0], indexes[i][1])
-    slices = tuple(slices)
-    sliced_image = image_ndarray[slices]
-    return sliced_image
-
-
 def mask_image_func(image_ndarray, mask_template_ndarray) -> np.ndarray:
     mask_ndarray = mask_template_ndarray
     return np.where(mask_ndarray == 255, image_ndarray, np.zeros(image_ndarray.shape))
 
-
-def resize_image(patch_size, image):
-    # only donwsampling, so use nearest neighbor that is faster to run
-    resized_image = np.zeros(patch_size)
-    for i in range(image.shape[0]):
-        resized_image[i] = tf.image.resize(
-            image[i], (patch_size[1], patch_size[2]
-                       ), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
-        )
-    # resized_image = tf.cast(resized_image, tf.float16)  # / 127.5 - 1.0
-    return resized_image
-
-
+##This class given the image list csv created in create_metadata script, will create a lazy loading dataset, this will work for single cells, FOVS, double input or double target. and even for classifiers
 class DataGen(keras.utils.Sequence):
 
-    def __init__(self, image_list_csv, input_col, target_col,
+    def __init__(self, image_list_csv, 
+                 input_col, 
+                 target_col,
                  batch_size,
                  num_batches=4,
                  patches_from_image=32,
                  patch_size=(16, 256, 256, 1),
-                 min_precentage=0,
+                 
+                 #use this to take partial list this will indicate where to start and where to finish
+                 min_precentage=0, 
                  max_precentage=1,
+                 
+                 ## get a specific image number for the creation
                  image_number = None,
+                 
+                #the target will contain a tuple of the target_col and the input_col
                  input_as_y=False,
+                #the input will contain a tuple of the target_col and the input_col
                  output_as_x=False,
+                 
+                 #crop single cell images by the bounding cube made by the whole cell segmentation
                  crop_edge=False,
+                 #mask the single cell by the whole cell segmentation
                  mask=False,
+                 #what column is contains the whole cell segmentation
                  mask_col='membrane_seg',
-                 norm=True,
+                #use dialtion on the mask
                  dilate=False,
                  dilate_kernel=np.ones((25, 25), np.uint8),
-                 noise=False,
-                 resize=True,
-                 augment=False,
-                 delete_cahce=False,
-                 predictors=None,
-                 pairs=False,
-                 masking_pair = False,
-                 cutoff = 0.0,
-                 neg_ratio=1,
+                 
+                 #do normalization
+                 norm=True,
+                 #std or minmax
                  norm_type="std",
+                 #add some noise to the input
+                 noise=False,
+                 #resize patch
+                 resize=True,
+                 #do rotation augmentation
+                 augment=False,
+                 #delete SSD cache from previous runs
+                 delete_cahce=False,
+                 
+                 # a dict that map organelle to a model if predictors is True the output of the model will be joined to the input as the input
+                 predictors=None,
+                 
+                 #If True the input will be pairs of the input_col and target_col and the target will by 1 if they are a matching pair and 0 otherwise
+                 pairs=False,
+                 #Mask them randomaly to make the prediction harder
+                 masking_pair = False,
+                 # if max value in a target patch of the pair, both the real target and the random one is lower then the cutoff value then we say both are backgrounfd and they are matching as well
+                 cutoff = 0.0,
+                 # % of matching pairs in the dataset this is a number > 1 (1:neg_ratio)
+                 neg_ratio=1,
+
+                 #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = "/scratch/sarithol@auth.ad.bgu.ac.il/{}/temp".format(
+        self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(
             os.environ.get('SLURM_JOB_ID'))
         if delete_cahce:
             shutil.rmtree(self.new_path_origin)
@@ -344,9 +345,9 @@ class DataGen(keras.utils.Sequence):
                                     input_image.shape[o]-self.patch_size[o]+1)
                                 patch_indexes.append(
                                     (random_patch_index, random_patch_index+self.patch_size[o]))
-                            input_patch = slice_image(
+                            input_patch = ImageUtils.slice_image(
                                 input_image, [*patch_indexes, (None, None)])
-                            target_patch = slice_image(
+                            target_patch = ImageUtils.slice_image(
                                 target_image, [*patch_indexes, (None, None)])
                             if (self.patch_size[0] == 1):  # 2D image
                                 input_patch = input_patch[0]
@@ -355,7 +356,7 @@ class DataGen(keras.utils.Sequence):
                             self.input_buffer[pos] = input_patch
                             self.target_buffer[pos] = target_patch
                             if self.for_clf:
-                                masked_input_patch = slice_image(masked_input_image, [*patch_indexes, (None, None)])                                
+                                masked_input_patch = ImageUtils.slice_image(masked_input_image, [*patch_indexes, (None, None)])                                
                                 label = 12
                                 if np.sum(masked_input_patch/255.) > 1:
                                     label = self.df.get_item(image_index, 'label')
@@ -407,7 +408,6 @@ class DataGen(keras.utils.Sequence):
                                             pred_image = np.expand_dims(pred_image[0], axis=-1)
                                         else:
                                             pred_image = normalize(pred_image, max_value=1.0, dtype=np.float32)                                    
-                                    # ImageUtils.imsave(pred_image, new_prediction_path)
                                     self.pred_buffer[i*self.batch_size+j *self.patches_from_image] = pred_image
 
                         self.input_buffer[i*self.batch_size+j *
@@ -429,7 +429,6 @@ class DataGen(keras.utils.Sequence):
             # if (old_image_path != image_path):
             #     os.remove(image_path)
           
-
     def fill_buffer(self):
         threads = []
         num_threads = 4

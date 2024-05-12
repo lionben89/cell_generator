@@ -22,7 +22,7 @@ requirements = [
     "cell_imaging_utils",
     "tqdm",
     "scikit-learn",
-    "opencv-python",
+    "opencv-python==4.8.0.74",
     "scipy",
     "seaborn",
     "patchify",
@@ -41,7 +41,7 @@ setuptools.setup(
     keywords="cell_generator",
     name="cell_generator",
     packages=setuptools.find_packages(exclude=["images"]),
-    python_requires=">=3.7",
+    python_requires=">=3.6.8",
     test_suite="tests",
     url="https://github.com/lionben89/cell_generator",
     # Do not edit this string manually, always use bumpversion

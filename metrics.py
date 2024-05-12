@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend as K
 from math import log10, sqrt
 
 def PSNR(original, compressed):

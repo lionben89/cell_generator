@@ -2,6 +2,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 
+"""Variational Auto Encoder"""
 class Sampling(keras.layers.Layer):
     """Uses (mu, sigma) to sample z."""
 

@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import scipy
 import tensorflow as tf
 import tensorflow.keras as keras
 from dataset import DataGen
@@ -8,6 +7,7 @@ from metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 import os
+from utils import _get_weights
 
 #Model to predict and compare to GT
 gv.model_type = "UNET"
@@ -53,41 +53,8 @@ print("Organelle: ",gv.organelle)
 print("Compound: ",compound)
 print("Vehicle: ", drug)
 
-#Method to create triangular scheme of weights to deal with overlap
-# in patchs, prediction towards the center of the patch will have higher weight in the end prediction.
-def _get_weights(shape):
-    shape_in = shape
-    shape = shape[1:]
-    weights = 1
-    for idx_d in range(len(shape)):
-        slicey = [np.newaxis] * len(shape)
-        slicey[idx_d] = slice(None)
-        size = shape[idx_d]
-        values = scipy.signal.triang(size)
-        weights = weights * values[tuple(slicey)] #scipy.ndimage.gaussian_filter(values, sigma=1)[tuple(slicey)]
-        
-        #weights = weights * np.ones(size)[tuple(slicey)]
-    return np.broadcast_to(weights, shape_in).astype(np.float32)
-
-def normalize(image_ndarray,max_value=255,dtype=np.uint8) -> np.ndarray:
-    image_ndarray = image_ndarray.astype(np.float64)
-    max_var = np.max(image_ndarray!=np.inf)
-    image_ndarray = np.where(image_ndarray==np.inf,max_var,image_ndarray)
-    temp_image = image_ndarray-np.min(image_ndarray)
-    return ((temp_image)/((np.max(temp_image))*max_value)).astype(dtype)
-
 #Create a test dataset with 1 sample just to take the list of the images
 test_dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False, norm_type=norm_type,predictors=predictors)
-
-
-def slice_image(image_ndarray: np.ndarray, indexes: list) -> np.ndarray:
-    n_dim = len(image_ndarray.shape)
-    slices = [slice(None)] * n_dim
-    for i in range(len(indexes)):
-        slices[i] = slice(indexes[i][0], indexes[i][1])
-    slices = tuple(slices)
-    sliced_image = image_ndarray[slices]
-    return sliced_image
 
 if (gv.model_type == "VAE"):
     from models.VAE import *
@@ -181,7 +148,7 @@ elif (gv.model_type == "AE"):
     print("avg pearson correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
 
 elif (gv.model_type == "CLF"):
-    clf = keras.models.load_model(gv.clf_model_path)
+    clf = keras.models.load_model(gv.model_path)
     dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 4, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False, for_clf=for_clf)
     for i in range(20):
         clf.evaluate(dataset)
@@ -189,7 +156,7 @@ elif (gv.model_type == "CLF"):
 elif (gv.model_type == "UNET"):
     # images = [1]
     images = range(min(10,test_dataset.df.get_shape()[0]))
-    unet = keras.models.load_model(gv.unet_model_path)
+    unet = keras.models.load_model(gv.model_path)
     if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
         os.makedirs("{}/predictions".format(gv.unet_model_path))
     pcc = 0
@@ -222,23 +189,13 @@ elif (gv.model_type == "UNET"):
             # nuc_seg = np.expand_dims(nuc_seg[0], axis=-1)
             
             if norm_type == "minmax":
-                target_image = normalize(target_image,max_value=1.0,dtype=np.float32)
-                input_image = normalize(input_image,max_value=1.0,dtype=np.float32)
-                pred_image = normalize(pred_image,max_value=1.0,dtype=np.float32)
+                target_image = ImageUtils.normalize(target_image,max_value=1.0,dtype=np.float32)
+                input_image = ImageUtils.normalize(input_image,max_value=1.0,dtype=np.float32)
+                pred_image = ImageUtils.normalize(pred_image,max_value=1.0,dtype=np.float32)
             else:
-                target_mean = np.mean(target_image,dtype=np.float64)
-                target_std = np.std(target_image,dtype=np.float64)
-                target_image = (target_image-target_mean)/target_std
-                
-                max_var = np.max(input_image!=np.inf)
-                input_image = np.where(input_image==np.inf,max_var,input_image)
-                input_mean = np.mean(input_image,dtype=np.float64)
-                input_std = np.std(input_image,dtype=np.float64)
-                input_image = (input_image-input_mean)/input_std
-                
-                pred_mean = np.mean(pred_image,dtype=np.float64)
-                pred_std = np.std(pred_image,dtype=np.float64)
-                pred_image = (pred_image-pred_mean)/pred_std
+                target_image = ImageUtils.normalize_std(target_image,max_value=1.0,dtype=np.float32)
+                input_image = ImageUtils.normalize_std(input_image,max_value=1.0,dtype=np.float32)
+                pred_image = ImageUtils.normalize_std(pred_image,max_value=1.0,dtype=np.float32)
         
         i=0
         j=0
@@ -252,8 +209,8 @@ elif (gv.model_type == "UNET"):
             while j<=input_image.shape[1]-gv.patch_size[1]:
                 while k<=input_image.shape[2]-gv.patch_size[2]:
                     s = [(i,i+gv.patch_size[0]),(j,j+gv.patch_size[1]),(k,k+gv.patch_size[2])]
-                    patch = slice_image(input_image,s)
-                    pred_patch = slice_image(pred_image,s)
+                    patch = ImageUtils.slice_image(input_image,s)
+                    pred_patch = ImageUtils.slice_image(pred_image,s)
                     patch = ImageUtils.to_shape(patch,gv.patch_size,min_shape=gv.patch_size)
                     if predictors:
                         pred_patch = ImageUtils.to_shape(pred_patch,gv.patch_size,min_shape=gv.patch_size)
@@ -290,15 +247,16 @@ elif (gv.model_type == "UNET"):
 elif (gv.model_type == "MG"):
     import tensorflow_addons as tfa
     from models.MaskInterpreter import *
-    mg = keras.models.load_model(gv.mg_model_path)
+    noise_scale=5.0
+    mg = keras.models.load_model(gv.model_path)
     dir_path = "predictions"
-    if (not os.path.exists("{}/{}".format(gv.mg_model_path,dir_path))):
-        os.makedirs("{}/{}".format(gv.mg_model_path,dir_path))
+    if (not os.path.exists("{}/{}".format(gv.model_path,dir_path))):
+        os.makedirs("{}/{}".format(gv.model_path,dir_path))
     
     for image_index in [0,1,2]:#range(int(test_dataset.df.get_shape()[0]*0.00),int(test_dataset.df.get_shape()[0]*0.01)): # range(1):#range(test_dataset.df.get_shape()[0]):
         # image_index = 1
-        if (not os.path.exists("{}/{}/{}".format(gv.mg_model_path,dir_path,image_index))):
-            os.makedirs("{}/{}/{}".format(gv.mg_model_path,dir_path,image_index))
+        if (not os.path.exists("{}/{}/{}".format(gv.model_path,dir_path,image_index))):
+            os.makedirs("{}/{}/{}".format(gv.model_path,dir_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
@@ -317,14 +275,8 @@ elif (gv.model_type == "MG"):
             target_image = ImageUtils.get_channel(image_ndarray,channel_index)
             input_image = np.expand_dims(input_image[0], axis=-1)
             target_image = np.expand_dims(target_image[0], axis=-1)
-            target_mean = np.mean(target_image,dtype=np.float64)
-            target_std = np.std(target_image,dtype=np.float64)
-            target_image = (target_image-target_mean)/target_std
-            max_var = np.max(input_image!=np.inf)
-            input_image = np.where(input_image==np.inf,max_var,input_image)
-            input_mean = np.mean(input_image,dtype=np.float64)
-            input_std = np.std(input_image,dtype=np.float64)
-            input_image = (input_image-input_mean)/input_std
+            target_image = ImageUtils.normalize_std(target_image)
+            input_image = ImageUtils.normalize_std(input_image)
             channel_index = int(test_dataset.df.get_item(image_index,"structure_seg"))
             seg_image = ImageUtils.get_channel(image_ndarray,channel_index)
             seg_image = np.expand_dims(seg_image[0], axis=-1)
@@ -345,10 +297,10 @@ elif (gv.model_type == "MG"):
             j=center_xy[0]-128-o
             k=center_xy[1]-128-o                        
             s_full = [(0,input_image.shape[0]),(center_xy[0]-128-o,center_xy[0]+128+o),(center_xy[1]-128-o,center_xy[1]+128+o)]
-            sliced_input = slice_image(input_image,s_full)
-            sliced_target = slice_image(target_image,s_full)
-            sliced_nuc = slice_image(nuc_image,s_full)
-            sliced_mem = slice_image(mem_image,s_full)
+            sliced_input = ImageUtils.slice_image(input_image,s_full)
+            sliced_target = ImageUtils.slice_image(target_image,s_full)
+            sliced_nuc =ImageUtils. slice_image(nuc_image,s_full)
+            sliced_mem = ImageUtils.slice_image(mem_image,s_full)
             prediction = np.zeros_like(sliced_input)
             mask = np.zeros_like(sliced_input)
             adapted_input = np.zeros_like(sliced_input)
@@ -356,24 +308,17 @@ elif (gv.model_type == "MG"):
             d = np.zeros_like(sliced_input)+1e-4
             d2 = np.zeros_like(sliced_input)+1e-4
              
-            # while i<=input_image.shape[0]-gv.patch_size[0]:
-            #     while j<=input_image.shape[1]-gv.patch_size[1]:
-            #         while k<=input_image.shape[2]-gv.patch_size[2]:
             while i<=input_image.shape[0]-gv.patch_size[0]:
                 while j<=center_xy[0]+128+o-gv.patch_size[1]:
                     while k<=center_xy[1]+128+o-gv.patch_size[2]:            
                         s = [(i,i+gv.patch_size[0]),(j,j+gv.patch_size[1]),(k,k+gv.patch_size[2])]
-                        patch = slice_image(input_image,s)
+                        patch = ImageUtils.slice_image(input_image,s)
                         patch = ImageUtils.to_shape(patch,gv.patch_size,min_shape=gv.patch_size)
-                        seg_patch = slice_image(seg_image,s)
+                        seg_patch = ImageUtils.slice_image(seg_image,s)
                         patch_p = mg.unet(np.expand_dims(patch,axis=0))
                         mask_p = mg(np.expand_dims(patch,axis=0))
-                        # mask_p2 = tf.where(mask_p>th,mask_p,0.0) ## th
                         mask_p2 = tf.where(tf.math.logical_and(mask_p>th,mask_p<=(th+0.1)),0.0,mask_p) ## th
-                        # mask_p = np.expand_dims(seg_patch/255.0,axis=0) #tf.where(seg_patch>0,mask_p,tf.constant(0.0,dtype=tf.float64))
-                        # mask_p = tf.nn.max_pool3d(mask_p, ksize=3, strides=1, padding="SAME", name='dilation3D')
-                        # mask_p = tf.cast(mask_p,dtype=tf.float64)
-                        normal_noise = tf.random.normal(tf.shape(mask_p),stddev=1.0,dtype=tf.float64)*1.0
+                        normal_noise = tf.random.normal(tf.shape(mask_p),stddev=noise_scale,dtype=tf.float64)
                         mask_noise = (normal_noise*(1-mask_p2))
                         adapted_input_p = patch+mask_noise
                         adapted_prediction_p = mg.unet(adapted_input_p)
@@ -395,7 +340,6 @@ elif (gv.model_type == "MG"):
                 
             mask2 = mask/d    
             mask2 = tf.where(tf.math.logical_and((mask2)>th,(mask2)<=(th+0.1)),0.0,mask2).numpy()
-            # mask2 = tf.where(mask>th,mask,0.0).numpy()
             ImageUtils.imsave(sliced_input,"{}/{}/{}/{}/input_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
             ImageUtils.imsave(sliced_target,"{}/{}/{}/{}/target_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
             ImageUtils.imsave(sliced_nuc,"{}/{}/{}/{}/nuc_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
@@ -408,7 +352,7 @@ elif (gv.model_type == "MG"):
             print("pearson corr for image:{} is :{}, mask ratio:{}".format(image_index,pearson_corr((prediction/d)[:,:,:], (adapted_prediction/(d))[:,:,:]),np.mean(mask2,dtype=np.float64)))
 
 elif (gv.model_type == "RC"):
-    rc = keras.models.load_model(gv.rc_model_path)
+    rc = keras.models.load_model(gv.model_path)
     if (not os.path.exists("{}/predictions".format(gv.rc_model_path))):
         os.makedirs("{}/predictions".format(gv.rc_model_path))
     n = test_dataset.__len__()
@@ -441,34 +385,24 @@ elif (gv.model_type == "RC"):
         ppc/(n*patchs.shape[0]), pred_ppc/(n*patchs.shape[0])))
 
 elif (gv.model_type == "PM"):
-    pm = keras.models.load_model(gv.pm_model_path)
+    pm = keras.models.load_model(gv.model_path)
     if (not os.path.exists("{}/predictions".format(gv.pm_model_path))):
         os.makedirs("{}/predictions".format(gv.pm_model_path))
-    unet = keras.models.load_model("./unet_model_x_mse_2_3_nobn_ne")
+    unet = keras.models.load_model(gv.interpert_model_path)
     len = test_dataset.__len__()
     total_ba = []
     for j in range(len):
         patchs = test_dataset.__getitem__(j)[0]
         labels = test_dataset.__getitem__(j)[1]
-        # unet_input = unpatchify(patchs[0].reshape(1,4,4,16,64,64),(16,256,256)).reshape(gv.patch_size)
-        # unet_image =unet(np.expand_dims(unet_input,axis=0)).numpy()[0]
-        # unet_patchs = patchify(unet_image,(16,64,64,1),step=64).reshape(16,16,64,64,1)
         predictions = pm([patchs[0],patchs[1]]).numpy()
-        # unet_predictions = pm([patchs[0],unet_patchs]).numpy()
         total_ba.append(tf.reduce_mean(keras.metrics.binary_accuracy(labels,predictions)))
         for i in range(patchs[0].shape[0]):
             k = j*patchs[0].shape[0] + i
-            # prediction = pm([patchs[0][0:1],patchs[1][i:i+1]]).numpy()
             if k < 32:
-                # ImageUtils.imsave(
-                    # unet_patchs[i], "{}/predictions/unet_prediction_patch_{}.tiff".format(gv.pm_model_path, k))
                 ImageUtils.imsave(
                     patchs[0][i], "{}/predictions/input_patch_{}.tiff".format(gv.pm_model_path, k))
                 ImageUtils.imsave(
                     patchs[1][i], "{}/predictions/target_patch_{}.tiff".format(gv.pm_model_path, k))
-            
-            # pear = pearson_corr(target_patchs[i], prediction_patchs[i])
-            # s_pear = pearson_corr(target_patchs[i], s_prediction_patchs[i])
             print("score for pair {}: prediction:{}, label:{}".format(
                 k, predictions[i], labels[i]))
     print("total accuracy is :",np.average(total_ba))

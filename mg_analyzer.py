@@ -28,7 +28,7 @@ z_step = 16
 batch_size = 4
 noise_scale = 5.0
 
-def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(2),weighted_pcc=False):
+def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
     
     batch_size=4
     
@@ -40,7 +40,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(2)
     ## Create noise vars
     noise_start = 0.0
     noise_step = 0.5
-    noise_stop = 1.5
+    noise_stop = 4.5
     noises = np.arange(noise_start,noise_stop,noise_step)
         
     dir_path = "{}".format(model_path)

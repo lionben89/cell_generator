@@ -15,16 +15,16 @@ gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 #If mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "./unet_model_22_05_22_dna_128b" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_actin_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "./mg_model_dna_10_06_22_5_0_dnab3"
+gv.model_path = "../mg_model_actin_13_05_24_1.5"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
-gv.target = "channel_dna"
+gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "DNA" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -43,15 +43,16 @@ drug = compound #"Vehicle"
 if compound is not None:
     ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug)
 else:
-    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)
+    ds_path = gv.train_ds_path
     
 gv.batch_size = 4
 norm_type = "std"
 gv.patch_size = (32,128,128,1)
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
+print(gv.organelle)
 #example to add predictors to the dataset predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
-train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None)
+train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None,delete_cahce=True)
 validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None)
 
 if (gv.model_type == "VAE"):
@@ -153,8 +154,8 @@ elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
     
-    mask_loss_weight=0.1 #0.1 is the default value 
-    noise_scale = 5.0 #5.0 is the default value
+    mask_loss_weight=1.0 #0.1 is the default value 
+    noise_scale = 1.5 #value according to find_noise_scale
     
     #The default target score calculation is regular PCC, if one wish to use weighted PCC uncomment the line below
     weighted_pcc = False
@@ -184,7 +185,7 @@ elif (gv.model_type == "MG"):
     
     # checkpoint callback monitoring "val_stop" decides when to save the epoch, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
     # term and term value make surm that the value of term in the loss is greater then the term value before saving the epoch
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.9)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
     print("mask_loss_weight: ",mask_loss_weight)
     print("noise_scale: ",noise_scale)
     early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_stop")

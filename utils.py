@@ -119,12 +119,12 @@ def collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,image, patch_
     return np.array(patchs)
 
 ##Resize image using TF, this why this code is here and not in ImageUtils
-def resize_image(image_ndarray, image):
+def resize_image(resize_shape, image):
     # only donwsampling, so use nearest neighbor that is faster to run
-    resized_image = np.zeros(image_ndarray)
+    resized_image = np.zeros(resize_shape)
     for i in range(image.shape[0]):
         resized_image[i] = tf.image.resize(
-            image[i], (image_ndarray[1], image_ndarray[2]
+            image[i], (resize_shape[1], resize_shape[2]
                     ), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
         )
     return resized_image

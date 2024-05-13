@@ -101,7 +101,7 @@ class MaskInterpreter(keras.Model):
             unet_predictions = self.unet(adapted_image)
 
             similiarity_loss = tf.reduce_mean(
-               tf.reduce_sum(
+               tf.reduce_mean(
                    keras.losses.mean_squared_error(unet_target, unet_predictions),axis=(1,2)
                ),axis=(0,1)
             )            
@@ -109,7 +109,7 @@ class MaskInterpreter(keras.Model):
             mean_importance_mask = tf.reduce_mean((importance_mask)) #tf.math.log
 
             importance_mask_loss = tf.reduce_mean(
-               tf.reduce_sum(
+               tf.reduce_mean(
                   keras.losses.mean_squared_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
                ),axis=(0,1)
             )
@@ -120,7 +120,7 @@ class MaskInterpreter(keras.Model):
             else:
                 pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
             
-            total_loss = 0.1*similiarity_loss + (importance_mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*1500
+            total_loss = similiarity_loss + (importance_mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*10
             
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)

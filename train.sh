@@ -1,17 +1,30 @@
 #!/bin/bash
-### sbatch config parameters must start with #SBATCH and must precede any other commands. to ignore just add another # - like ##SBATCH
-#SBATCH --partition main                         ### specify partition name where to run a job. debug: 2 hours; short: 7 days
-#SBATCH --time 5-01:00:00                      ### limit the time of job running, partition limit can override this. Format: D-H:MM:SS
-#SBATCH --output my_job-id-%J.out                ### output log for running job - %J for job number
-##SBATCH --mail-user=gilba@post.bgu.ac.il      ### users email for sending job status
-##SBATCH --mail-type=BEGIN,END,FAIL             ### conditions when to send the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-#SBATCH --gpus=1                ### number of GPUs (can't exceed 8 gpus for now) ask for more than 1 only if you can parallelize your code for multi GPU
-#SBATCH --exclude=dt-gpu-03,cs-1080-05
-#SBATCH --mem=36G
+
+################################################################################################
+### sbatch configuration parameters must start with #SBATCH and must precede any other commands.
+### To ignore, just add another # - like so: ##SBATCH
+################################################################################################
+
+#SBATCH --partition main			### specify partition name where to run a job. main: all nodes; gtx1080: 1080 gpu card nodes; rtx2080: 2080 nodes; teslap100: p100 nodes; titanrtx: titan nodes
+#SBATCH --time 4-10:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
+#SBATCH --job-name train.py			### name of the job
+#SBATCH --output train-%J.out			### output log for running job - %J for job number
+#SBATCH --gpus=1				### number of GPUs, allocating more than 1 requires IT team's permission. Example to request 3090 gpu: #SBATCH --gpus=rtx_3090:1
+##SBATCH --exclude=dt-gpu-03,cs-1080-05,cs-1080-02,cs-1080-01,cs-1080-03,,cs-1080-04,ise-gpu-02,cs-6000-02,cs-gpu-01,cs-gpu-02
+
+# Note: the following 4 lines are commented out
+##SBATCH --mail-user=user@post.bgu.ac.il	### user's email for sending job status messages
+##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
+#SBATCH --mem=48G				### ammount of RAM memory, allocating more than 60G requires IT team's permission
 #SBATCH --tmp=200G             ### Asks to allocate enough space on /scratch
-#SBATCH --cpus-per-task=6 # 6 cpus per task – use for multithreading, usually with --tasks=1
-#SBATCH --tasks=1 # 4 processes – use for multiprocessing
-### Start you code below ####
+################  Following lines will be executed by a compute node    #######################
+
+### Print some data to output file ###
+echo `date`
+echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID
+echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
+
+### CODE
 module load anaconda              ### load anaconda module
 source activate cell_generator_new        ### activating environment, environment must be configured before running the job
 export PYTHONUNBUFFERED=TRUE 

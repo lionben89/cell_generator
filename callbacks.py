@@ -34,6 +34,19 @@ class SaveModelCallback(keras.callbacks.Callback):
                 print("model saved.")
     
 
+# class ChangeWeightLossCallbackMaskInterpreter(keras.callbacks.Callback):
+#         def on_batch_end(self, epoch, logs=None):
+            
+#             if logs["pcc"] > self.model.pcc_target:
+#                 self.model.mask_loss_weight = 10.0 
+#                 self.model.similiarity_loss_weight = 0.0
+#                 print("new mask_loss_weight is:",self.model.mask_loss_weight)   
+#             else:
+#                 self.model.mask_loss_weight = 10.0 
+#                 self.model.similiarity_loss_weight = 0.0
+#                 print("new mask_loss_weight is:",self.model.mask_loss_weight)   
+#             self.last_importance_mask_size=logs["importance_mask_size"]
+        
 # class CustomCallback(keras.callbacks.Callback):
 #     def on_train_begin(self, logs=None):
 #         keys = list(logs.keys())

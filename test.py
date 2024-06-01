@@ -7,21 +7,21 @@ from metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 import os
-from utils import _get_weights
+from utils import get_weights
 
-#Model to predict and compare to GT
-gv.model_type = "UNET"
+#Methods to predict and compare to GT
+gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "./unet_model_22_05_22_dna_128b"
+gv.model_path = "../mg_model_er_13_05_24_1.5"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
-gv.target = "channel_dna"
+gv.target = "channel_target"
 
 #Organelle to predict the model upon
-gv.organelle = "Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
@@ -31,8 +31,8 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    gv.train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle.replace(' ','-'))
-    gv.test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(gv.organelle.replace(' ','-'))
+    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
@@ -48,7 +48,7 @@ gv.patch_size = (32,128,128,1)
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
-print("Model: ",gv.unet_model_path)
+print("Model: ",gv.model_path)
 print("Organelle: ",gv.organelle)
 print("Compound: ",compound)
 print("Vehicle: ", drug)
@@ -157,13 +157,13 @@ elif (gv.model_type == "UNET"):
     # images = [1]
     images = range(min(10,test_dataset.df.get_shape()[0]))
     unet = keras.models.load_model(gv.model_path)
-    if (not os.path.exists("{}/predictions".format(gv.unet_model_path))):
-        os.makedirs("{}/predictions".format(gv.unet_model_path))
+    if (not os.path.exists("{}/predictions".format(gv.model_path))):
+        os.makedirs("{}/predictions".format(gv.model_path))
     pcc = 0
     for image_index in images:        
         # image_index = 1
-        if (not os.path.exists("{}/predictions/{}".format(gv.unet_model_path,image_index))):
-            os.makedirs("{}/predictions/{}".format(gv.unet_model_path,image_index))
+        if (not os.path.exists("{}/predictions/{}".format(gv.model_path,image_index))):
+            os.makedirs("{}/predictions/{}".format(gv.model_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
@@ -219,7 +219,7 @@ elif (gv.model_type == "UNET"):
                         patch_p = unet.unet(np.expand_dims(np.concatenate([patch,pred_patch],axis=-1),axis=0))
                     else:
                         patch_p = unet(np.expand_dims(patch,axis=0))
-                    weights = _get_weights(patch_p.shape)
+                    weights = get_weights(patch_p.shape)
                     prediction[i:i+gv.patch_size[0],j:j+gv.patch_size[1],k:k+gv.patch_size[2]] += patch_p*weights #((std*patch_p)+mean)/1000
                     d[i:i+gv.patch_size[0],j:j+gv.patch_size[1],k:k+gv.patch_size[2]] += weights[0]
                     k+=o
@@ -232,10 +232,10 @@ elif (gv.model_type == "UNET"):
         input_cut = (input_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         # nuc_seg_cut = (nuc_seg)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         
-        ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
-        # ImageUtils.imsave(nuc_seg_cut.astype(np.float16),"{}/predictions/{}/nuc_seg_patch_{}.tiff".format(gv.unet_model_path,image_index,image_index))
+        ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        # ImageUtils.imsave(nuc_seg_cut.astype(np.float16),"{}/predictions/{}/nuc_seg_patch_{}.tiff".format(gv.model_path,image_index,image_index))
         p=pearson_corr(target_cut, prediction_cut)
         pcc+=p
         print("pearson corr for image:{} is :{}".format(image_index,p))
@@ -245,111 +245,8 @@ elif (gv.model_type == "UNET"):
     print("average pcc:{}".format(pcc/len(images)))
 
 elif (gv.model_type == "MG"):
-    import tensorflow_addons as tfa
-    from models.MaskInterpreter import *
-    noise_scale=5.0
-    mg = keras.models.load_model(gv.model_path)
-    dir_path = "predictions"
-    if (not os.path.exists("{}/{}".format(gv.model_path,dir_path))):
-        os.makedirs("{}/{}".format(gv.model_path,dir_path))
-    
-    for image_index in [0,1,2]:#range(int(test_dataset.df.get_shape()[0]*0.00),int(test_dataset.df.get_shape()[0]*0.01)): # range(1):#range(test_dataset.df.get_shape()[0]):
-        # image_index = 1
-        if (not os.path.exists("{}/{}/{}".format(gv.model_path,dir_path,image_index))):
-            os.makedirs("{}/{}/{}".format(gv.model_path,dir_path,image_index))
-        image_path = test_dataset.df.get_item(image_index,'path_tiff')
-        input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
-        target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
-        seg_image = None
-        nuc_image = None
-        ths = [-0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9] #[0.0]#[1.00,0.0,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-        if (input_image is None or target_image is None or seg_image is None):
-
-            organelle_mask_plus = ImageUtils.image_to_ndarray(ImageUtils.imread("/sise/home/lionb/mg_model_mito_29_05_22pcc1_0_of/predictions_cell/0/mask_binary_organelle_plus.tif"))
-            organelle_mask_plus = np.expand_dims(organelle_mask_plus[0], axis=-1)
-            image_ndarray = None
-            image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(image_path))
-            channel_index = int(test_dataset.df.get_item(image_index,test_dataset.input_col))
-            input_image = ImageUtils.get_channel(image_ndarray,channel_index)
-            channel_index = int(test_dataset.df.get_item(image_index,test_dataset.target_col))
-            target_image = ImageUtils.get_channel(image_ndarray,channel_index)
-            input_image = np.expand_dims(input_image[0], axis=-1)
-            target_image = np.expand_dims(target_image[0], axis=-1)
-            target_image = ImageUtils.normalize_std(target_image)
-            input_image = ImageUtils.normalize_std(input_image)
-            channel_index = int(test_dataset.df.get_item(image_index,"structure_seg"))
-            seg_image = ImageUtils.get_channel(image_ndarray,channel_index)
-            seg_image = np.expand_dims(seg_image[0], axis=-1)
-            channel_index = int(test_dataset.df.get_item(image_index,"channel_dna"))
-            nuc_image = ImageUtils.get_channel(image_ndarray,channel_index)
-            nuc_image = np.expand_dims(nuc_image[0], axis=-1)
-            channel_index = int(test_dataset.df.get_item(image_index,"channel_membrane"))
-            mem_image = ImageUtils.get_channel(image_ndarray,channel_index)
-            mem_image = np.expand_dims(mem_image[0], axis=-1)
-        for th in ths:
-            if (not os.path.exists("{}/{}/{}/{}".format(gv.mg_model_path,dir_path,image_index,th))):
-                os.makedirs("{}/{}/{}/{}".format(gv.mg_model_path,dir_path,image_index,th))
-            o = 32
-            od = 16
-            weights = None
-            center_xy = [243,192]
-            i=0
-            j=center_xy[0]-128-o
-            k=center_xy[1]-128-o                        
-            s_full = [(0,input_image.shape[0]),(center_xy[0]-128-o,center_xy[0]+128+o),(center_xy[1]-128-o,center_xy[1]+128+o)]
-            sliced_input = ImageUtils.slice_image(input_image,s_full)
-            sliced_target = ImageUtils.slice_image(target_image,s_full)
-            sliced_nuc =ImageUtils. slice_image(nuc_image,s_full)
-            sliced_mem = ImageUtils.slice_image(mem_image,s_full)
-            prediction = np.zeros_like(sliced_input)
-            mask = np.zeros_like(sliced_input)
-            adapted_input = np.zeros_like(sliced_input)
-            adapted_prediction = np.zeros_like(sliced_input)
-            d = np.zeros_like(sliced_input)+1e-4
-            d2 = np.zeros_like(sliced_input)+1e-4
-             
-            while i<=input_image.shape[0]-gv.patch_size[0]:
-                while j<=center_xy[0]+128+o-gv.patch_size[1]:
-                    while k<=center_xy[1]+128+o-gv.patch_size[2]:            
-                        s = [(i,i+gv.patch_size[0]),(j,j+gv.patch_size[1]),(k,k+gv.patch_size[2])]
-                        patch = ImageUtils.slice_image(input_image,s)
-                        patch = ImageUtils.to_shape(patch,gv.patch_size,min_shape=gv.patch_size)
-                        seg_patch = ImageUtils.slice_image(seg_image,s)
-                        patch_p = mg.unet(np.expand_dims(patch,axis=0))
-                        mask_p = mg(np.expand_dims(patch,axis=0))
-                        mask_p2 = tf.where(tf.math.logical_and(mask_p>th,mask_p<=(th+0.1)),0.0,mask_p) ## th
-                        normal_noise = tf.random.normal(tf.shape(mask_p),stddev=noise_scale,dtype=tf.float64)
-                        mask_noise = (normal_noise*(1-mask_p2))
-                        adapted_input_p = patch+mask_noise
-                        adapted_prediction_p = mg.unet(adapted_input_p)
-                        if weights is None:
-                            weights = _get_weights(patch_p.shape)
-                        j_x = j-(center_xy[0]-128-o)
-                        k_x = k-(center_xy[1]-128-o)
-                        prediction[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += patch_p*weights 
-                        mask[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += mask_p*weights 
-                        adapted_input[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += adapted_input_p*weights 
-                        adapted_prediction[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += adapted_prediction_p*weights 
-                        d[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += weights[0]
-                        d2[i:i+gv.patch_size[0],j_x:j_x+gv.patch_size[1],k_x:k_x+gv.patch_size[2]] += 1
-                        k+=o
-                    k=center_xy[1]-128-o  
-                    j+=o
-                j=center_xy[0]-128-o
-                i+=od
-                
-            mask2 = mask/d    
-            mask2 = tf.where(tf.math.logical_and((mask2)>th,(mask2)<=(th+0.1)),0.0,mask2).numpy()
-            ImageUtils.imsave(sliced_input,"{}/{}/{}/{}/input_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave(sliced_target,"{}/{}/{}/{}/target_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave(sliced_nuc,"{}/{}/{}/{}/nuc_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave(sliced_mem,"{}/{}/{}/{}/mem_patch_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave((prediction/(d))[:,:,:],"{}/{}/{}/{}/unet_prediction_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave(mask2[:,:,:],"{}/{}/{}/{}/mask_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave((adapted_prediction/(d))[:,:,:],"{}/{}/{}/{}/adapted_unet_prediction_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            ImageUtils.imsave((adapted_input/(d))[:,:,:],"{}/{}/{}/{}/adapted_input_{}.tiff".format(gv.mg_model_path,dir_path,image_index,th,image_index))
-            print(th)
-            print("pearson corr for image:{} is :{}, mask ratio:{}".format(image_index,pearson_corr((prediction/d)[:,:,:], (adapted_prediction/(d))[:,:,:]),np.mean(mask2,dtype=np.float64)))
+    from mg_analyzer import analyze_th
+    analyze_th(test_dataset,"regular",mask_image=None,manual_th="full",save_image=1,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,images=[0,1])
 
 elif (gv.model_type == "RC"):
     rc = keras.models.load_model(gv.model_path)

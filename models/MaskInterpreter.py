@@ -58,7 +58,7 @@ class MaskInterpreter(keras.Model):
         #Show the stop value which decides when to stop the training, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
         self.stop = keras.metrics.Mean(name = "stop")
         
-    def compile(self, g_optimizer, similiarity_loss_weight=1. ,mask_loss_weight=0.01, noise_scale=5.0, run_eagerly=False):
+    def compile(self, g_optimizer, similiarity_loss_weight=1. ,mask_loss_weight=1.0, noise_scale=1.5, target_loss_weight=10.0, run_eagerly=False):
         """Compile the model
 
         Args:
@@ -66,6 +66,7 @@ class MaskInterpreter(keras.Model):
             similiarity_loss_weight (float, optional): factor to multiply the similiarity loss term, usually the MSE. Defaults to 1..
             mask_loss_weight (float, optional): factor to multiply the importance mask loss term, usually the SUM of the importance values. Defaults to 0.01.
             noise_scale (float, optional): the STD of the noise generated, usually chosen by noising the entire input and measuring the predictions similarity. Defaults to 5.0.
+            target_loss_weight(float, optional): the weight for the PCC target term -> if 0.0 means the loss will not use it.
             run_eagerly (bool, optional): keras args. Defaults to False.
         """
         super(MaskInterpreter, self).compile(run_eagerly=run_eagerly)
@@ -73,6 +74,7 @@ class MaskInterpreter(keras.Model):
         self.similiarity_loss_weight = similiarity_loss_weight
         self.mask_loss_weight = mask_loss_weight
         self.noise_scale = noise_scale
+        self.target_loss_weight = target_loss_weight
     
     @property
     def metrics(self):
@@ -106,7 +108,7 @@ class MaskInterpreter(keras.Model):
                ),axis=(0,1)
             )            
             
-            mean_importance_mask = tf.reduce_mean((importance_mask)) #tf.math.log
+            mean_importance_mask = tf.reduce_mean((importance_mask))
 
             importance_mask_loss = tf.reduce_mean(
                tf.reduce_mean(
@@ -116,11 +118,13 @@ class MaskInterpreter(keras.Model):
             
             if self.weighted_pcc:
                 #data_1 is the segmented organelle for the weighted PCC
-                pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions,data_1)),-1.0,self.pcc_target)
+                human_eval = (tf_pearson_corr(unet_target,unet_predictions,data_1))
             else:
-                pcc_loss = tf.clip_by_value((tf_pearson_corr(unet_target,unet_predictions)),-1.0,self.pcc_target)
+                human_eval = (tf_pearson_corr(unet_target,unet_predictions))
             
-            total_loss = similiarity_loss + (importance_mask_loss)*self.mask_loss_weight + (self.pcc_target-pcc_loss)*10
+            pcc_loss =  tf.math.abs(self.pcc_target-human_eval)
+            
+            total_loss = (similiarity_loss)*self.similiarity_loss_weight + (importance_mask_loss)*self.mask_loss_weight + (pcc_loss)*self.target_loss_weight
             
         if (train):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
@@ -129,15 +133,15 @@ class MaskInterpreter(keras.Model):
         self.importance_mask_size.update_state((1-mean_importance_mask))
         self.similiarity_loss_tracker.update_state(similiarity_loss)  
         self.binary_size_mask.update_state(tf.zeros_like(importance_mask), importance_mask)
-        self.pcc.update_state(pcc_loss)
+        self.pcc.update_state(human_eval)
         self.total_loss_tracker.update_state(total_loss)
-        self.stop.update_state(self.pcc_target-pcc_loss + mean_importance_mask)
+        self.stop.update_state(pcc_loss + mean_importance_mask)
                
         return {
             "similiarity_loss": self.similiarity_loss_tracker.result(),
             "binary_size": self.binary_size_mask.result(),
             "importance_mask_size": self.importance_mask_size.result(),
-            "total loss":self.total_loss_tracker.result(),
+            "total_loss":self.total_loss_tracker.result(),
             "pcc":self.pcc.result(),
             "stop": self.stop.result()
         }

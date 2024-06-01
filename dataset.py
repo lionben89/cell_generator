@@ -196,7 +196,7 @@ class DataGen(keras.utils.Sequence):
                 input_image, new_input_path = self.get_image_from_ssd(
                     image_path, self.input_col)
                 if (self.augment and input_image is not None):
-                    print(input_image.shape)
+                    # print(input_image.shape)
                     input_image = np.rot90(input_image, axes=(1,2), k=k)
                     
                 if not self.for_clf:
@@ -213,7 +213,7 @@ class DataGen(keras.utils.Sequence):
                 if (input_image is None or (target_image is None and not self.for_clf)):
                     image_ndarray = ImageUtils.image_to_ndarray(
                         ImageUtils.imread(image_path))
-                    image_ndarray = image_ndarray.astype(np.float16)
+                    image_ndarray = image_ndarray.astype(np.float32)
                     if (self.augment):
                         image_ndarray = np.rot90(image_ndarray, axes=(2, 3), k=k)
                     if (self.crop_edge):
@@ -248,7 +248,7 @@ class DataGen(keras.utils.Sequence):
                         if self.norm_type == "std":
                             input_image = ImageUtils.normalize_std(input_image)
                         else:
-                            input_image = ImageUtils.normalize(input_image, max_value=1.0, dtype=np.float16)
+                            input_image = ImageUtils.normalize(input_image, max_value=1.0, dtype=np.float32)
 
                     if (self.target_col == self.input_col or self.for_clf):
                         target_image = input_image
@@ -269,17 +269,17 @@ class DataGen(keras.utils.Sequence):
                                 if self.norm_type == "std":
                                     target_image = ImageUtils.normalize_std(target_image)
                                 else:
-                                    target_image = ImageUtils.normalize(target_image, max_value=1.0, dtype=np.float16)
+                                    target_image = ImageUtils.normalize(target_image, max_value=1.0, dtype=np.float32)
                     if (self.noise):
                         target_image += np.random.normal(0,
                                                         0.05, size=target_image.shape)
                         target_image = np.clip(target_image, 0, 1)
                     input_image = np.expand_dims(input_image[0], axis=-1)
                     target_image = np.expand_dims(target_image[0], axis=-1)
-                    if get_size_in_GB(self.new_path_origin)<198:
+                    if get_size_in_GB(self.new_path_origin)<100:
                         ImageUtils.imsave(input_image, new_input_path)
                     if not self.for_clf:
-                        if get_size_in_GB(self.new_path_origin)<198:
+                        if get_size_in_GB(self.new_path_origin)<100:
                             ImageUtils.imsave(target_image, new_target_path)
 
                 if self.pairs:
@@ -383,8 +383,8 @@ class DataGen(keras.utils.Sequence):
                                         if self.norm_type == "std":
                                             pred_image = ImageUtils.normalize_std(pred_image)
                                         else:
-                                            pred_image = ImageUtils.normalize(pred_image, max_value=1.0, dtype=np.float16)  
-                                    if get_size_in_GB(self.new_path_origin)<198:
+                                            pred_image = ImageUtils.normalize(pred_image, max_value=1.0, dtype=np.float32)  
+                                    if get_size_in_GB(self.new_path_origin)<100:
                                         ImageUtils.imsave(pred_image, new_prediction_path)                                  
                                     self.pred_buffer[i*self.batch_size+j *self.patches_from_image] = pred_image
 

@@ -8,23 +8,23 @@ from callbacks import *
 from metrics import *
 import pandas as pd
 
-CONTINUE_TRAINING = True ## False to override current model with the same name
+CONTINUE_TRAINING = False ## False to override current model with the same name
 
 #Model to train
 gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
-#If mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_actin_128" ## UNET model if in MG mode it is the model that we want to interpret
+#If Mask Interpreter then add the path to the model you want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_mito_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_actin_13_05_24_1.5"
+gv.model_path = "../mg_model_mito_13_05_24_1.5"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Mitochondria"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -154,7 +154,8 @@ elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
     
-    mask_loss_weight=1.0 #0.1 is the default value 
+    target_loss_weight = 2.0 #10.0 is the default value 
+    mask_loss_weight=1.0 #1.0 is the default value 
     noise_scale = 1.5 #value according to find_noise_scale
     
     #The default target score calculation is regular PCC, if one wish to use weighted PCC uncomment the line below
@@ -185,12 +186,16 @@ elif (gv.model_type == "MG"):
     
     # checkpoint callback monitoring "val_stop" decides when to save the epoch, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
     # term and term value make surm that the value of term in the loss is greater then the term value before saving the epoch
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.85)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.87)
+    
     print("mask_loss_weight: ",mask_loss_weight)
     print("noise_scale: ",noise_scale)
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_stop")
-    model.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,run_eagerly=False,noise_scale=noise_scale)
-    losses = model.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback]) 
+    print("target_loss_weight:",target_loss_weight)
+    
+    early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_total_loss")
+    # weight_loss_adaptor_callback = ChangeWeightLossCallbackMaskInterpreter()
+    model.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,noise_scale=noise_scale,target_loss_weight=target_loss_weight,run_eagerly=True)
+    losses = model.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback])  #weight_loss_adaptor_callback
         
     a = pd.DataFrame(losses.history)
     a.to_csv("{}/losses.csv".format(gv.model_path))

@@ -26,10 +26,18 @@ xy_step = 64
 z_step = 16
 
 batch_size = 4
-noise_scale = 5.0
+noise_scale = 1.5
 
 def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
-    
+    """This method run analysis that find the std of the noise that need to be used for the input data
+        We test the prediction of noisy input by adding noise to the input with different stds, the noisy input is 0.5 signal, 0.5 noise.
+    Args:
+        dataset (_type_): _description_
+        model_path (_type_, optional): _description_. Defaults to gv.model_path.
+        model (_type_, optional): _description_. Defaults to None.
+        images (_type_, optional): _description_. Defaults to range(10).
+        weighted_pcc (bool, optional): _description_. Defaults to False.
+    """
     batch_size=4
     
     ##Load model
@@ -113,7 +121,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
             normal_noise = tf.random.normal(tf.shape(input_patchs),stddev=noise_scale,dtype=tf.float64)
             
             ## Create noisy input and predict unet
-            input_patchs_p = input_patchs+normal_noise
+            input_patchs_p = 0.5*input_patchs+0.5*normal_noise
             unet_noise_patchs_p = predict(model,input_patchs_p.numpy(),batch_size,gv.patch_size)
     
             ## Back to image 
@@ -136,7 +144,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
         
     pcc_results.create()
 
-def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None):
+def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,images=range(10)):
     """method that generate masks and predictions by thresholding the importance mask with different TH
 
     Args:
@@ -155,8 +163,8 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
     """
     ##Load model
     if model is None:
-        print("Loading model:",param["model"])
-    model = keras.models.load_model(param["model"])
+        print("Loading model:",model_path)
+    model = keras.models.load_model(model_path)
     ## Create thresholds
     num_bins = 10 # number of bins for the histogram
     ths_start = 0.1
@@ -266,12 +274,11 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
         unet_p,mask_p_full,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,mask_patchs_p,np.ones_like(mask_patchs_p)],weights,input_image.shape,gv.patch_size,xy_step,z_step)
         # mem_seg_image = np.ones_like(unet_p)
         mask_p_full = mask_p_full
-        
         for th in ths:
             print(th)
             print("mask predict ...")
             if save_image:
-                create_dir_if_not_exist("{}/{}/{}".format(dir_path,image_index,th))
+                create_dir_if_not_exist("{}/{}/{}".format(dir_path,image_index,'{:.2f}'.format(float(th))))
             if mode=="mask" and mask_image is not None:
                 # mask_image_ndarray = target_seg_image
                 
@@ -280,19 +287,19 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
                 mask_image_ndarray = slice_image(mask_image_ndarray,slice_by)
                 
                 ## mask_p = (1. - mask_image_ndarray*0.0)
-                mask_p = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.5),tf.float64).numpy()
+                mask_p = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
                 mask_p_binary = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
             elif mode=="agg":
                 mask_p_binary = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.0),tf.float64).numpy()
-                mask_p = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.5),tf.float64).numpy()
+                mask_p = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.0),tf.float64).numpy()
             elif mode=="loo":
                 ## 1.0 no noise, 0.0 is noise
                 mask_p_binary = tf.cast(tf.where(tf.math.logical_and(mask_p_full/d>(th-ths_step),mask_p_full/d<=th),1.0,0.0),tf.float64).numpy()
-                mask_p = tf.cast(tf.where(tf.math.logical_and(mask_p_full/d>(th-ths_step),mask_p_full/d<=th),1.0,0.5),tf.float64).numpy()
+                mask_p = tf.cast(tf.where(tf.math.logical_and(mask_p_full/d>(th-ths_step),mask_p_full/d<=th),1.0,0.0),tf.float64).numpy()
             else:
                 if manual_th != "full":
                     mask_p_binary = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.0),tf.float64).numpy()
-                    mask_p = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.5),tf.float64).numpy()
+                    mask_p = tf.cast(tf.where((mask_p_full/d)>th,1.0,0.0),tf.float64).numpy()
                 else:
                     mask_p_binary = np.ones_like(mask_p_full)
                     mask_p = mask_p_full/d
@@ -310,9 +317,9 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
             input_p,unet_noise_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p],weights,input_image.shape,gv.patch_size,xy_step,z_step)
             
             ## Save images
-            if save_image:
+            if save_image == True or image_index<save_image:
                 print("saving mask images...")
-                base_save = "{}/{}/{}/".format(dir_path,image_index,th)
+                base_save = "{}/{}/{}/".format(dir_path,image_index,'{:.2f}'.format(float(th)))
                 ImageUtils.imsave((mask_p).astype(np.float16),"{}/mask_{}.tiff".format(base_save,image_index))
                 ImageUtils.imsave((input_p/d).astype(np.float16),"{}/noisy_input_{}.tiff".format(base_save,image_index))
                 ImageUtils.imsave((unet_noise_p/d).astype(np.float16),"{}/noisy_unet_prediction_{}.tiff".format(base_save,image_index))  
@@ -334,7 +341,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
             del mask_noise_patchs
             del mask_patchs_p_term
             
-        if save_image:
+        if save_image == True or image_index<save_image:
             print("saving global images...")
             image_save = "{}/{}/".format(dir_path,image_index)
             ImageUtils.imsave((input_image).astype(np.float16),"{}/input_{}.tiff".format(image_save,image_index))
@@ -366,7 +373,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
         histos.create()
         histos_fig.savefig("{}/histograms.png".format(dir_path))
 
-def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_organelle_precent_pixels=0.05,compound=None,is_vehicle=False,model_path=gv.model_path):
+def analyze_correlations_constant(organelles,mask_th,save_image=True,absoulte_organelle_precent_pixels=0.05,compound=None,is_vehicle=False,model_path=gv.model_path):
     """This method is used to evaluate the importance of pixels of a certain organelle W.R.T random pixels.
 
     Args:
@@ -379,6 +386,11 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
         model_path (str, optional): _description_. Defaults to gv.model_path.
     """
     ## Create main dir and organelle subdir
+    
+    ##Load model
+    if model is None:
+        print("Loading model:",model_path)
+    model = keras.models.load_model(model_path)
     pred_path = "predictions_correlations_constant"
         
     base_dir_path = "{}/{}".format(model_path,pred_path)
@@ -461,7 +473,7 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
             mask_p_full = mask_p_full/d
             
             base_save = "{}/{}/".format(dir_path,image_index)
-            if image_index<save_images:
+            if save_image == True or image_index<save_image:
                 ## Create image dir
                 create_dir_if_not_exist(base_save)
                 print("saving global images...")
@@ -475,7 +487,7 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
                 normal_noise = tf.random.normal(tf.shape(mask_patchs_p),stddev=noise_scale,dtype=tf.float32)              
                 print("mask predict ...")
                 mask_p_binary = tf.where(mask_p_full>mask_th,1.0,0.0)
-                mask_p = tf.where((mask_p_binary)>mask_th,1.0,0.5)
+                mask_p = tf.where((mask_p_binary)>mask_th,1.0,0.0)
                 mask_organelle_itersection = (mask_p_binary * target_seg_image)
                 ratio_of_organelle_in_image = np.sum(target_seg_image,dtype=np.float64)/np.prod(target_seg_image.shape)
                 
@@ -494,23 +506,23 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
                     continue
                 organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(organelle_precent_pixels),organelle_precent_pixels])
                 mask_p_binary_wo_organelle_pixels = 1 - organelle_pixels_target_seg_image*mask_organelle_itersection #+ (1-target_seg_image) + (1-mask_p_binary),0.0)
-                mask_p_wo_organelle_pixels = tf.where(mask_p_binary_wo_organelle_pixels>0.0,1.0,0.5)
+                mask_p_wo_organelle_pixels = tf.where(mask_p_binary_wo_organelle_pixels>0.0,1.0,0.0)
                 
                 organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image),ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image])
                 wo_organelle_pixels_binary = tf.math.minimum((target_seg_image * (1 - organelle_pixels_target_seg_image))+((1-target_seg_image)),1.0)
-                wo_organelle_pixels = tf.where(wo_organelle_pixels_binary>0.0,1.0,0.5)  
+                wo_organelle_pixels = tf.where(wo_organelle_pixels_binary>0.0,1.0,0.0)  
                 
                 # random_pixels_binary = np.random.choice([1.0,0.0],target_seg_image.shape,p=[1-(absoulte_organelle_precent_pixels),absoulte_organelle_precent_pixels])
                 # random_pixels = tf.where(random_pixels_binary>0.0,1.0,0.0)  
                 
                 organelle_pixels_target_seg_image = np.random.choice([0.0,1.],target_seg_image.shape,p=[1-(ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image_flip),ratio_of_noise_pixels_in_image/ratio_of_organelle_in_image_flip])
                 random_flip_binary = tf.math.minimum(((1-target_seg_image)*target_seg_image_flip * (1 - organelle_pixels_target_seg_image))+((1-target_seg_image_flip))+(target_seg_image*target_seg_image_flip),1.0)
-                random_flip = tf.where(random_flip_binary>0.0,1.0,0.5)                                              
+                random_flip = tf.where(random_flip_binary>0.0,1.0,0.0)                                              
                 del organelle_pixels_target_seg_image
                 del target_seg_image_flip
                 
                 random_pixels_binary = np.random.choice([0.0,1.],target_seg_image.shape,p=[ratio_of_noise_pixels_in_image,1-ratio_of_noise_pixels_in_image])
-                random_pixels = tf.where(random_pixels_binary>0.0,1.0,0.5)
+                random_pixels = tf.where(random_pixels_binary>0.0,1.0,0.0)
                 
                 ## Create noisy input and predict unet
                 mask_patchs_p_term = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,mask_p, gv.patch_size, xy_step, z_step)
@@ -541,7 +553,7 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
                 input_p,unet_noise_p,unet_noise_wo_organelle_pixels_p,unet_noise_wo_organelle_pixels_wo_mask_p,unet_noise_random_flip_p,unet_noise_random_pixels_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p,unet_noise_patchs_wo_organelle_pixels_p,unet_noise_patchs_wo_organelle_pixels_wo_mask_p,unet_noise_patchs_random_flip_p,unet_noise_patchs_random_pixels_p],weights,input_image.shape,gv.patch_size,xy_step,z_step)
                 
                 ## Save images
-                if image_index<save_images:
+                if save_image == True or image_index<save_image:
                     print("saving mask images...")
                     ImageUtils.imsave(mask_p_binary.numpy().astype(np.float16),"{}/mask_{}.tiff".format(base_save,image_index))
                     ImageUtils.imsave(mask_p_binary_wo_organelle_pixels.numpy().astype(np.float16),"{}/mask_wo_organelle_pixels_{}.tiff".format(base_save,image_index))            
@@ -613,7 +625,7 @@ def analyze_correlations_constant(organelles,mask_th,save_images=True,absoulte_o
             del mask_patchs_p
         corr_results.create()
         
-def analyze_predictions(organelle,save_images=True,compound=None,is_vehicle=False,model_path=gv.model_path,model=None):
+def analyze_predictions(organelle,save_image=True,compound=None,is_vehicle=False,model_path=gv.model_path,model=None):
     """Calculate PCC between orininal and noisy input predictions for images of an organelle.
 
     Args:
@@ -707,7 +719,7 @@ def analyze_predictions(organelle,save_images=True,compound=None,is_vehicle=Fals
         unet_p,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,np.ones_like(unet_patchs_p)],weights,input_image.shape,gv.patch_size,xy_step,z_step)
         
         base_save = "{}/{}/".format(dir_path,image_index)
-        if image_index<save_images:
+        if save_image == True or image_index<save_image:
             ## Create image dir
             create_dir_if_not_exist(base_save)
             print("saving global images...")

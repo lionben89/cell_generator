@@ -8,7 +8,7 @@ from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import Da
 #and True if you wnt the same files for all organlles
 GLOBAL_LIST = False
 #The path to where the metadata of the downloaded images
-storage_root = "/storage/users/assafzar/full_cells_fovs_perturbation/" #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
+storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/" #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
 #path to save to lists in the end
 if GLOBAL_LIST:
   lists_root_dir = "/home/lionb/cell_generator"

@@ -26,7 +26,7 @@ xy_step = 64
 z_step = 16
 
 batch_size = 4
-noise_scale = 1.5
+
 
 def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
     """This method run analysis that find the std of the noise that need to be used for the input data
@@ -39,7 +39,6 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
         weighted_pcc (bool, optional): _description_. Defaults to False.
     """
     batch_size=4
-    
     ##Load model
     if model is None:
         print("Loading model:",model_path)
@@ -144,7 +143,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
         
     pcc_results.create()
 
-def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,images=range(10)):
+def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,images=range(10), noise_scale = 1.5):
     """method that generate masks and predictions by thresholding the importance mask with different TH
 
     Args:
@@ -167,7 +166,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
     model = keras.models.load_model(model_path)
     ## Create thresholds
     num_bins = 10 # number of bins for the histogram
-    ths_start = 0.1
+    ths_start = 0.0
     ths_step = 0.1
     ths_stop = 1.1
     ths = np.arange(ths_start,ths_stop,ths_step)
@@ -216,7 +215,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
         mask_sizes = []
         context=[]
         ## Create image dir
-        if save_image:
+        if save_image == True or image_index<save_image:
             create_dir_if_not_exist("{}/{}".format(dir_path,image_index))
         
         ## Preprocess images
@@ -277,7 +276,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
         for th in ths:
             print(th)
             print("mask predict ...")
-            if save_image:
+            if save_image == True or image_index<save_image:
                 create_dir_if_not_exist("{}/{}/{}".format(dir_path,image_index,'{:.2f}'.format(float(th))))
             if mode=="mask" and mask_image is not None:
                 # mask_image_ndarray = target_seg_image

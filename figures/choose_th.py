@@ -10,16 +10,15 @@ from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import Da
 from mg_analyzer import analyze_th
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5"},
-        #   {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5"},
-        #   {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5"},
-        #   {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5"},
-        #   {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.5"}
-          
-        #   {"organelle":"Mitochondria","model":"../unet_model_22_05_22_mito_128"},
-        #   {"organelle":"Nuclear-envelope","model":"../unet_model_22_05_22_ne_128"},
-        #   {"organelle":"Microtubules","model":"../unet_model_22_05_22_microtubules_128"},
-        #   {"organelle":"Actin-filaments","model":"../unet_model_22_05_22_actin_128"},
+          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
+          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
+          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
+          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
+          # {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5},
+          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
+          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
+          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
           ]
 
 gv.input = "channel_signal"
@@ -34,10 +33,13 @@ def plot_th_analysis():
     for i, ax in enumerate(axs.flatten()):
         try:
             # load PCC data for each subplot
-            csv_path = "{}/predictions_agg/pcc_resuls.csv".format(params[i]["model"])
-            pcc_data = DatasetMetadataSCV(csv_path,csv_path)
+            pcc_csv_path = "{}/predictions_agg/pcc_resuls.csv".format(params[i]["model"])
+            pcc_data = DatasetMetadataSCV(pcc_csv_path,pcc_csv_path)
+            mask_size_csv_path = "{}/predictions_agg/mask_size_resuls.csv".format(params[i]["model"])
+            mask_size_data = DatasetMetadataSCV(mask_size_csv_path,mask_size_csv_path)
             ths = np.array(list(map(lambda val: float('{:.2f}'.format(float(val))), pcc_data.data.columns[1:])))
             pcc = pcc_data.data.mean(axis=0)[1:]
+            mask_size = 1 - mask_size_data.data.mean(axis=0)[1:]  # Calculating mean mask
             
             # Plotting
             ax.plot(ths, pcc, label='Model Prediction Quality')
@@ -50,8 +52,10 @@ def plot_th_analysis():
             if over_threshold.size > 0:  # Check if there's any value below the threshold
                 last_over = over_threshold[-1]
                 ax.axvline(x=last_over, color='g', linestyle=':', label=f'Critical TH: {last_over}')
-            
-            ax.legend()
+                mean_mask_vol = mask_size[np.argmin(np.abs(ths - last_over))] * 100
+                ax.text(last_over + 0.02, 0.1, f'Mean Mask Vol: {mean_mask_vol:.2f}%', transform=ax.transData, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+
+            ax.legend(loc='upper right')
         except Exception as e:
             print("data for subplot {} not exist".format(i))
 
@@ -65,7 +69,8 @@ for param in params:
     print(param["organelle"])
     ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"])
     dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
-    analyze_th(dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = weighted_pcc, model_path=param["model"],model=None,compound=None,images=range(10))
+    print("# images in dataset:",dataset.df.data.shape[0])
+    analyze_th(dataset,"agg",mask_image=None,manual_th="full",save_image=5,save_histo=False,weighted_pcc = weighted_pcc, model_path=param["model"],model=None,compound=None,images=range(min(10,dataset.df.data.shape[0])),noise_scale=param["noise"])
 plot_th_analysis()
 
 

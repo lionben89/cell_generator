@@ -70,7 +70,7 @@ class DataGen(keras.utils.Sequence):
                  #do rotation augmentation
                  augment=False,
                  #delete SSD cache from previous runs
-                 delete_cahce=False,
+                 delete_cahce=True,
                  
                  # a dict that map organelle to a model if predictors is True the output of the model will be joined to the input as the input
                  predictors=None,
@@ -87,11 +87,18 @@ class DataGen(keras.utils.Sequence):
                  #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = "/scratch/lionb@auth.ad.bgu.ac.il/{}/temp".format(
-            os.environ.get('SLURM_JOB_ID'))
+        self.new_path_origin = "/scratch/{}/{}/temp".format(
+            os.environ.get('LOGNAME'),os.environ.get('SLURM_JOB_ID'))
         if delete_cahce:
-            if os.path.exists(self.new_path_origin):
-                shutil.rmtree(self.new_path_origin)
+            try:
+                if os.path.exists(self.new_path_origin):
+                    shutil.rmtree(self.new_path_origin)
+            except Exception as e:
+                print("SSD storage is not exist in self.new_path_origin")
+                print(e)
+                self.new_path_origin = "/sise/assafzar-group/assafzar/temp/{}".format(os.environ.get('LOGNAME'))
+                if os.path.exists(self.new_path_origin):
+                    shutil.rmtree(self.new_path_origin)
 
         self.df = DatasetMetadataSCV(image_list_csv, image_list_csv)
         self.n = self.df.get_shape()[0]
@@ -153,9 +160,15 @@ class DataGen(keras.utils.Sequence):
                     (self.buffer_size, *self.patch_size))
             if self.for_clf:
                 self.labels_buffer = np.zeros((self.buffer_size, 1))
-
-        if (not os.path.exists(self.new_path_origin)):
-            os.makedirs(self.new_path_origin)
+        try:
+            if (not os.path.exists(self.new_path_origin)):
+                os.makedirs(self.new_path_origin)
+        except Exception as e:
+                print("SSD storage is not exist in self.new_path_origin")
+                print(e)
+                self.new_path_origin = "/sise/assafzar-group/assafzar/temp/{}".format(os.environ.get('LOGNAME'))
+                if (not os.path.exists(self.new_path_origin)):
+                    os.makedirs(self.new_path_origin)
 
         self.fill_buffer()
 

@@ -9,7 +9,7 @@
 #SBATCH --time 4-10:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
 #SBATCH --job-name train.py			### name of the job
 #SBATCH --output train-%J.out			### output log for running job - %J for job number
-#SBATCH --gpus=1				### number of GPUs, allocating more than 1 requires IT team's permission. Example to request 3090 gpu: #SBATCH --gpus=rtx_3090:1
+#SBATCH --gpus=rtx_3090:1				### number of GPUs, allocating more than 1 requires IT team's permission. Example to request 3090 gpu: #SBATCH --gpus=rtx_3090:1
 ##SBATCH --exclude=dt-gpu-03,cs-1080-05,cs-1080-02,cs-1080-01,cs-1080-03,,cs-1080-04,ise-gpu-02,cs-6000-02,cs-gpu-01,cs-gpu-02
 
 # Note: the following 4 lines are commented out

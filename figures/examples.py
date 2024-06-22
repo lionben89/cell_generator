@@ -1,37 +1,71 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from skimage.transform import resize
+from scipy.stats import entropy
 from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","slices":[32,32,32,32],"th":0.6},
-        #   {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5"},
-        #   {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5"},
-        #   {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5"},
-        #   {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.5"}
-          
-        #   {"organelle":"Mitochondria","model":"../unet_model_22_05_22_mito_128"},
-        #   {"organelle":"Nuclear-envelope","model":"../unet_model_22_05_22_ne_128"},
-        #   {"organelle":"Microtubules","model":"../unet_model_22_05_22_microtubules_128"},
-        #   {"organelle":"Actin-filaments","model":"../unet_model_22_05_22_actin_128"},
+          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[32,32,32,32]},
+          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[32,32,32,32]},
+          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[32,32,32,32]},
+          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[32,32,32,32]},
+        #   # {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":1.0},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[32,32,32,32]},
+          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.4,"slices":[32,32,32,32]},
+          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[32,32,32,32]},
+          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[32,32,32,32]},
           ]
-# Function to overlay mask on input image
-def overlay_mask(input_image, mask_image, alpha=0.5):
-    mask_image = mask_image / np.max(mask_image)
-    # Combine input image and mask
-    overlay = input_image * (1 - alpha) + mask_image * alpha
-    return overlay
 
-# Create sample images
-def collect_images(param,image_index):
-    input_image = ImageUtils.image_to_ndarray(ImageUtils.imread("{}/predictions_agg/input_{}.tiff".format(param["model"],image_index)))[:,:,param["slices"][image_index]]
-    mask_image = ImageUtils.image_to_ndarray(ImageUtils.imread("{}/predictions_agg/{}/mask_{}.tiff".format(param["model"],param["th"],image_index)))[:,:,param["slices"][image_index]]
-    prediction_original = ImageUtils.image_to_ndarray(ImageUtils.imread("{}/predictions_agg/unet_prediction_{}.tiff".format(param["model"],image_index)))[:,:,param["slices"][image_index]]
-    prediction_noisy = ImageUtils.image_to_ndarray(ImageUtils.imread("{}/predictions_agg/{}/noisy_unet_prediction_{}.tiff".format(param["model"],param["th"],image_index)))[:,:,param["slices"][image_index]]
-    ground_truth = ImageUtils.image_to_ndarray(ImageUtils.imread("{}/predictions_agg/target_{}.tiff".format(param["model"],image_index)))[:,:,param["slices"][image_index]]
-    return input_image, mask_image, prediction_original, prediction_noisy, ground_truth
+# Function to overlay mask on input image with a turquoise color
+def overlay_mask(input_image, mask_image, alpha=0.5):
+    # Create an RGB version of the gray input image
+    colored_input = np.stack([input_image] * 3, axis=-1)
+    # Define the turquoise color (normalized RGB values)
+    turquoise_color = np.array([64, 224, 208]) / 255.0
+    mask_rgb = np.stack([mask_image * turquoise_color[0],
+                         mask_image * turquoise_color[1],
+                         mask_image * turquoise_color[2]], axis=-1)
+    # Combine input image and mask
+    overlay = colored_input * (1 - alpha) + mask_rgb * alpha
+    return (overlay*255.0).astype(int)
+
+def calculate_entropy(slice):
+    """Calculate Shannon entropy of a given image slice."""
+    hist, _ = np.histogram(slice, bins=256, range=(0, 1))
+    prob_dist = hist / hist.sum()
+    return entropy(prob_dist, base=2)
+
+def collect_images(param, image_index):
+    # Construct paths for the required images
+    base_path = "{}/predictions_agg/{}".format(param["model"], image_index)
+    file_paths = {
+        "prediction": "{}/unet_prediction_{}.tiff".format(base_path, image_index),
+        "input": "{}/input_{}.tiff".format(base_path, image_index),
+        "mask": "{}/{}/mask_{}.tiff".format(base_path, '{0:.2f}'.format(param["th"]), image_index),
+        "noisy_prediction": "{}/{}/noisy_unet_prediction_{}.tiff".format(base_path, '{0:.2f}'.format(param["th"]), image_index),
+        "ground_truth": "{}/target_{}.tiff".format(base_path, image_index)
+    }
+
+    # Check if files exist
+    for key, path in file_paths.items():
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"No such file: {path}")
+
+    # Load and normalize the stacks
+    stacks = {}
+    for key, path in file_paths.items():
+        stack = ImageUtils.image_to_ndarray(ImageUtils.imread(path))
+        stack = ImageUtils.normalize(stack, max_value=1.0, dtype=np.float32)
+        stacks[key] = stack
+
+    best_slice_index = param["slices"][image_index]
+
+    # Extract the most informative slice from each stack using the index found from the prediction stack
+    most_informative_slices = {key: stack[best_slice_index, :, :, 0] for key, stack in stacks.items()}
+
+    return most_informative_slices["input"], most_informative_slices["mask"], most_informative_slices["prediction"], most_informative_slices["noisy_prediction"], most_informative_slices["ground_truth"],best_slice_index
 
 # Resize images to fit the layout
 def resize_image(image, size=(int(312*1.5), int(462*1.5))):
@@ -39,42 +73,37 @@ def resize_image(image, size=(int(312*1.5), int(462*1.5))):
 
 # Create plot for a single organelle
 def plot_organelle(examples_per_organelle, param, save_path):
-    fig, axes = plt.subplots(4, examples_per_organelle, figsize=(9, 6), gridspec_kw={'hspace': 0.005, 'wspace': 0.001})
+    fig, axes = plt.subplots(4, examples_per_organelle, figsize=(12, 8), gridspec_kw={'hspace': 0.01, 'wspace': 0.001})
     
     for j in range(examples_per_organelle):
-        input_image, mask_image, prediction_original, prediction_noisy, ground_truth = collect_images(param,j)
+        input_image, mask_image, prediction_original, prediction_noisy, ground_truth, slice_index = collect_images(param, j)
         
+        # Display the overlay image where input and mask are combined
         overlay_image = overlay_mask(input_image, mask_image)
-        
-        overlay_image = resize_image(overlay_image)
-        prediction_noisy = resize_image(prediction_noisy)
-        prediction_original = resize_image(prediction_original)
-        ground_truth = resize_image(ground_truth)
-        
         axes[0, j].imshow(overlay_image)
+        title = axes[0, j].set_title(f'Slice {slice_index}', fontsize=10, pad=10)  # Increase pad to adjust space below title
+        title.set_position([0.5, 1.05])  # Adjust the title position
+
+        # Display prediction images and ground truth
+        axes[1, j].imshow(prediction_noisy, cmap='gray')
+        axes[2, j].imshow(prediction_original, cmap='gray')
+        axes[3, j].imshow(ground_truth, cmap='gray')
+        
+        # Set y-axis labels for the first column
         if j == 0:
             axes[0, j].set_ylabel('Input+Mask', fontsize=10, rotation=45, labelpad=30)
-        
-        axes[1, j].imshow(prediction_noisy, cmap='gray')
-        if j == 0:
             axes[1, j].set_ylabel('Prediction Noisy', fontsize=10, rotation=45, labelpad=30)
-        
-        axes[2, j].imshow(prediction_original, cmap='gray')
-        if j == 0:
             axes[2, j].set_ylabel('Prediction Original', fontsize=10, rotation=45, labelpad=30)
-        
-        axes[3, j].imshow(ground_truth, cmap='gray')
-        if j == 0:
             axes[3, j].set_ylabel('Ground Truth', fontsize=10, rotation=45, labelpad=30)
 
-    # Hide the y-axis lines and ticks but keep the labels
+    # Adjust axis visibility
     for ax in axes.flat:
         ax.get_xaxis().set_visible(False)
         ax.yaxis.label.set_visible(True)
         ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)   
-           
-    fig.suptitle("{} Mean PCC={}, TH={}".format(param["organelle"],param["th"]), fontsize=16,y=0.92) 
-    plt.subplots_adjust(wspace=0, hspace=0)
+    
+    fig.suptitle(f"{param['organelle']}, TH={param['th']}", fontsize=16, y=0.92)
+    plt.subplots_adjust(top=0.85)  # Adjust top spacing to accommodate subplot titles
     plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
@@ -138,15 +167,13 @@ def create_figure2(num_organelles, organelle_names, output_dir):
 output_dir = "../figures"
 os.makedirs(output_dir, exist_ok=True)
 
-# Define organelle names
-organelle_names = [f'Organelle {i+1}' for i in range(9)]
-
 # Generate and save individual organelle plots
 for param in params:
-    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
+    print(param["organelle"])
+    plot_organelle(examples_per_organelle=2, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
 
-# Create the first figure with the first 6 organelles
-create_figure1(num_organelles=6,organelle_names, output_dir=output_dir)
+# # Create the first figure with the first 6 organelles
+# create_figure1(num_organelles=6,organelle_names, output_dir=output_dir)
 
-# Create the second figure with the remaining organelles
-create_figure2(num_organelles=3,organelle_names, output_dir=output_dir)
+# # Create the second figure with the remaining organelles
+# create_figure2(num_organelles=3,organelle_names, output_dir=output_dir)

@@ -15,16 +15,16 @@ gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_mito_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_bundles_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_mito_13_05_24_1.5"
+gv.model_path = "../mg_model_bundles_13_05_24_1.0_no_target"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "Mitochondria"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Actomyosin-bundles" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -154,9 +154,9 @@ elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
     
-    target_loss_weight = 2.0 #10.0 is the default value 
+    target_loss_weight = 0.0 #2.0 is the default value 
     mask_loss_weight=1.0 #1.0 is the default value 
-    noise_scale = 1.5 #value according to find_noise_scale
+    noise_scale = 1.0 #value according to find_noise_scale
     
     #The default target score calculation is regular PCC, if one wish to use weighted PCC uncomment the line below
     weighted_pcc = False
@@ -186,7 +186,7 @@ elif (gv.model_type == "MG"):
     
     # checkpoint callback monitoring "val_stop" decides when to save the epoch, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
     # term and term value make surm that the value of term in the loss is greater then the term value before saving the epoch
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.87)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.88)
     
     print("mask_loss_weight: ",mask_loss_weight)
     print("noise_scale: ",noise_scale)

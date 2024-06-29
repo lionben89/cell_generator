@@ -16,7 +16,7 @@ data_provider = quilt3.Bucket("s3://allencell")
 #Path to data location in bucket
 download_path = "aics/pipeline_integrated_cell/"
 #where to save downloaded data
-storage_root = "/storage/users/assafzar/full_cells_fovs/"
+storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs/"
 #temp location to save data that is being processed (SSD memory)
 temp_storage_root = "/scratch/lionb@auth.ad.bgu.ac.il/{}/full_cells_fovs/".format(os.environ.get('SLURM_JOB_ID')) ##"/storage/users/assafzar/single_cells_fovs/"
 #path to metadata.csv
@@ -25,7 +25,7 @@ datasets_metadata_dir = "{}metadata.csv".format(storage_root)
 num_of_images_per_organelle = 200
 resacle_z = 3
 #what organelles to download
-organelles={"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
+organelles={"Endosomes":[]}#{"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
 
 ## instructions - channels in outputs images
 # 0-BF roi
@@ -43,7 +43,7 @@ organelles={"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"
 ## not found 'ATP2A2','HIST1H2BJ','NUP153','SMC1A','SON'
 
 #just create csvs without images
-only_csvs = False
+only_csvs = True
 #dowlowd and processed images that been processed in the past
 override = False
 

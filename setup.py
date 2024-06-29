@@ -26,7 +26,7 @@ requirements = [
     "scipy",
     "seaborn",
     "patchify",
-    "tensorflow-addons"
+    "tensorflow-addons",
 ]
 
 

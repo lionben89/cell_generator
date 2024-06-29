@@ -33,6 +33,7 @@ class DataGen(keras.utils.Sequence):
                  input_col, 
                  target_col,
                  batch_size,
+                 image_path_col = 'path_tiff',
                  num_batches=4,
                  patches_from_image=32,
                  patch_size=(16, 256, 256, 1),
@@ -104,6 +105,7 @@ class DataGen(keras.utils.Sequence):
         self.n = self.df.get_shape()[0]
         self.input_col = input_col
         self.target_col = target_col
+        self.image_path_col = image_path_col
         self.batch_size = batch_size
         self.num_batches = num_batches
         # if 1 resize image to patch size if >1 then sample patches with patch size
@@ -199,7 +201,7 @@ class DataGen(keras.utils.Sequence):
                 else:
                     image_index = self.image_number
 
-                image_path = self.df.get_item(image_index, 'path_tiff')
+                image_path = self.df.get_item(image_index, self.image_path_col)
 
                 if (self.augment):
                     k = np.random.random_integers(0, 3)

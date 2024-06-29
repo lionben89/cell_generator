@@ -18,7 +18,8 @@ params = [
           {"organelle":"Actin-filaments","model":"../unet_model_22_05_22_actin_128"},
           {"organelle":"Nucleolus-(Granular-Component)","model":"../unet_model_22_05_22_ngc_128"},
           {"organelle":"Mitochondria","model":"../unet_model_22_05_22_mito_128"},
-          {"organelle":"Actomyosin-bundles","model":"../unet_model_22_05_22_bundles_128"}
+          {"organelle":"Actomyosin-bundles","model":"../unet_model_22_05_22_bundles_128"},
+          {"organelle":"DNA","model":"../unet_model_22_05_22_dna_128"}
           ]
 
 gv.input = "channel_signal"
@@ -27,7 +28,7 @@ weighted_pcc = False
 
 def plot_noise_scale_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.2
-    fig, axs = plt.subplots(3, 3, figsize=(18, 12))  # 3x3 grid of subplots
+    fig, axs = plt.subplots(3, 4, figsize=(18, 12))  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -55,6 +56,7 @@ def plot_noise_scale_analysis():
             
             ax.legend()
         except Exception as e:
+            ax.axis('off')
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
@@ -63,11 +65,11 @@ def plot_noise_scale_analysis():
     plt.savefig("../figures/find_noise_scale.png")
 
 
-for param in params:
-    print(param["organelle"])
-    ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(param["organelle"])
-    dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
-    find_noise_scale(dataset,model_path=param["model"],weighted_pcc=weighted_pcc)
+# for param in params:
+#     print(param["organelle"])
+#     ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(param["organelle"])
+#     dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
+#     find_noise_scale(dataset,model_path=param["model"],weighted_pcc=weighted_pcc)
 plot_noise_scale_analysis()
 
 

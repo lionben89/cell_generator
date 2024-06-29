@@ -7,19 +7,19 @@ import os
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[32,32,32,32]},
-          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[32,32,32,32]},
-          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[32,32,32,32]},
-          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[32,32,32,32]},
-        #   # {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":1.0},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[32,32,32,32]},
-          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.4,"slices":[32,32,32,32]},
-          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[32,32,32,32]},
-          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[32,32,32,32]},
+          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[30,36,27,36]},
+          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[32,24,34,29]},
+          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[22,42,42,24]},
+          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[44,35,45,46]},
+          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[54,32,32,32]},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[44,28,36,25]},
+          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[42,32,33,18]},
+          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[27,24,28,20]},
+          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[56,48,36,55]},
           ]
 
 # Function to overlay mask on input image with a turquoise color
-def overlay_mask(input_image, mask_image, alpha=0.5):
+def overlay_mask(input_image, mask_image, alpha=0.25):
     # Create an RGB version of the gray input image
     colored_input = np.stack([input_image] * 3, axis=-1)
     # Define the turquoise color (normalized RGB values)
@@ -73,7 +73,7 @@ def resize_image(image, size=(int(312*1.5), int(462*1.5))):
 
 # Create plot for a single organelle
 def plot_organelle(examples_per_organelle, param, save_path):
-    fig, axes = plt.subplots(4, examples_per_organelle, figsize=(12, 8), gridspec_kw={'hspace': 0.01, 'wspace': 0.001})
+    fig, axes = plt.subplots(4, examples_per_organelle, figsize=(9.75, 8), gridspec_kw={'hspace': 0.0, 'wspace': 0.0})
     
     for j in range(examples_per_organelle):
         input_image, mask_image, prediction_original, prediction_noisy, ground_truth, slice_index = collect_images(param, j)
@@ -109,7 +109,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
 
 # Create the first figure with a 3x2 grid
 def create_figure1(num_organelles, organelle_names, output_dir):
-    fig, big_axes = plt.subplots(3, 2, figsize=(12, 12), gridspec_kw={'hspace': 0, 'wspace': 0})
+    fig, big_axes = plt.subplots(3, 2, figsize=(10, 12), gridspec_kw={'hspace': 0, 'wspace': 0})
 
     # Load each organelle's plot and add to the grid
     for i in range(3):
@@ -132,12 +132,12 @@ def create_figure1(num_organelles, organelle_names, output_dir):
 
 # Create the second figure with a 2x2 grid plus 1 in the third row
 def create_figure2(num_organelles, organelle_names, output_dir):
-    fig, big_axes = plt.subplots(2, 2, figsize=(12, 8), gridspec_kw={'hspace': 0, 'wspace': 0})
+    fig, big_axes = plt.subplots(2, 2, figsize=(10, 8), gridspec_kw={'hspace': 0, 'wspace': 0})
 
     # Load each organelle's plot and add to the grid
     for i in range(1):
         for j in range(2):
-            index = 6 + i * 2 + j
+            index = i * 2 + j
             if index < num_organelles:
                 ax = big_axes[i, j]
                 ax.axis('off')
@@ -149,10 +149,10 @@ def create_figure2(num_organelles, organelle_names, output_dir):
                 big_axes[i, j].axis('off')
 
     # Place the last organelle in the center of the third row
-    if num_organelles > 8:
+    if num_organelles % 2 ==1:
         ax = big_axes[1, 0]
         ax.axis('off')
-        image_path = os.path.join(output_dir, f"{organelle_names[8]}.png")
+        image_path = os.path.join(output_dir, f"{organelle_names[-1]}.png")
         if os.path.exists(image_path):
             img = plt.imread(image_path)
             ax.imshow(img)
@@ -166,14 +166,15 @@ def create_figure2(num_organelles, organelle_names, output_dir):
 # Directory to save individual plots
 output_dir = "../figures"
 os.makedirs(output_dir, exist_ok=True)
-
+organelle_names = []
 # Generate and save individual organelle plots
 for param in params:
     print(param["organelle"])
-    plot_organelle(examples_per_organelle=2, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
+    organelle_names.append(param["organelle"])
+    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
 
-# # Create the first figure with the first 6 organelles
-# create_figure1(num_organelles=6,organelle_names, output_dir=output_dir)
+# Create the first figure with the first 6 organelles
+create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)
 
-# # Create the second figure with the remaining organelles
-# create_figure2(num_organelles=3,organelle_names, output_dir=output_dir)
+# Create the second figure with the remaining organelles
+create_figure2(num_organelles=3,organelle_names=organelle_names[6:], output_dir=output_dir)

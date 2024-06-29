@@ -14,7 +14,7 @@ params = [
           {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
           {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
           {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
-          # {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
+          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
           {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5},
           {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
           {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
@@ -27,7 +27,7 @@ weighted_pcc = False
 
 
 def plot_th_analysis():
-    # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.9
+    # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.87
     fig, axs = plt.subplots(3, 3, figsize=(18, 12))  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
@@ -43,12 +43,12 @@ def plot_th_analysis():
             
             # Plotting
             ax.plot(ths, pcc, label='Model Prediction Quality')
-            ax.axhline(y=0.9, color='r', linestyle='--', label='Threshold: PCC=0.9')
+            ax.axhline(y=0.87, color='r', linestyle='--', label='Threshold: PCC=0.87')
             ax.set_title(params[i]["organelle"])
             ax.set_xlabel('TH')
             ax.set_ylabel('PCC')
             # Find the first x-value where PCC < 0.2 and annotate
-            over_threshold = ths[pcc > 0.9]
+            over_threshold = ths[pcc > 0.87]
             if over_threshold.size > 0:  # Check if there's any value below the threshold
                 last_over = over_threshold[-1]
                 ax.axvline(x=last_over, color='g', linestyle=':', label=f'Critical TH: {last_over}')

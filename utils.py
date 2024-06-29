@@ -38,9 +38,9 @@ def create_dir_if_not_exist(dir):
     if not os.path.exists(dir):
         os.makedirs(dir)
 
-def preprocess_image(dataset,image_index,channels,normalize=True,slice_by=None):
+def preprocess_image(dataset,image_index,channels,normalize=True,slice_by=None,image_path_col='path_tiff'):
     images = []
-    image_path = dataset.df.get_item(image_index,'path_tiff')
+    image_path = dataset.df.get_item(image_index,dataset.image_path_col)
     image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(image_path))
     for i in range(len(channels)):
         channel = channels[i]

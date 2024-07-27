@@ -8,16 +8,16 @@ import cv2
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[30,36,27,36]},
-          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[32,24,34,29]},
-          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[22,42,42,24]},
-          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[44,35,45,46]},
-          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[54,32,32,32]},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[44,28,36,25]},
-          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[42,32,33,18]},
-          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[27,24,28,20]},
-          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[56,48,36,55]},
-          {"organelle":"DNA","model":"../mg_model_dna_13_05_24_3.0","th":0.3,"slices":[33,40,32,39]},
+          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[7,19,30,42]},
+          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[7,19,32,44]},
+          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[7,22,34,48]},
+          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[18,30,44,51]},
+          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[9,23,42,54]},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[22,31,44,51]},
+          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[15,30,42,49]},
+          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[9,17,27,35]},
+          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[13,25,38,56]},
+          {"organelle":"DNA","model":"../mg_model_dna_13_05_24_3.0","th":0.3,"slices":[21,33,39,45]},
           ]
 def auto_balance(image):
     """Auto balance the image similar to ImageJ's Auto Contrast function."""
@@ -61,7 +61,7 @@ def calculate_entropy(slice):
     prob_dist = hist / hist.sum()
     return entropy(prob_dist, base=2)
 
-def collect_images(param, image_index):
+def collect_images(param, image_index, slice_num):
     # Construct paths for the required images
     base_path = "{}/predictions_agg/{}".format(param["model"], image_index)
     file_paths = {
@@ -84,7 +84,7 @@ def collect_images(param, image_index):
         stack = ImageUtils.normalize(stack, max_value=1.0, dtype=np.float32)
         stacks[key] = stack
 
-    best_slice_index = param["slices"][image_index]
+    best_slice_index = param["slices"][slice_num]
 
     # Extract the most informative slice from each stack using the index found from the prediction stack
     most_informative_slices = {key: auto_balance(stack[best_slice_index, :, :, 0]) for key, stack in stacks.items()}
@@ -100,7 +100,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
     fig, axes = plt.subplots(4, examples_per_organelle, figsize=(9.75, 8), gridspec_kw={'hspace': 0.0, 'wspace': 0.0})
     
     for j in range(examples_per_organelle):
-        input_image, mask_image, prediction_original, prediction_noisy, ground_truth, slice_index = collect_images(param, j)
+        input_image, mask_image, prediction_original, prediction_noisy, ground_truth, slice_index = collect_images(param, image_index, j)
         
         # Display the overlay image where input and mask are combined
         overlay_image = overlay_mask(input_image, mask_image)
@@ -142,16 +142,16 @@ def create_figure1(num_organelles, organelle_names, output_dir):
             if index < num_organelles:
                 ax = big_axes[i, j]
                 ax.axis('off')
-                image_path = os.path.join(output_dir, f"{organelle_names[index]}.png")
+                image_path = os.path.join(output_dir, f"{organelle_names[index]}_3d.png")
                 if os.path.exists(image_path):
                     img = plt.imread(image_path)
                     ax.imshow(img)
             else:
                 big_axes[i, j].axis('off')
 
-    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 1', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 1', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
-    plt.savefig(os.path.join(output_dir, "multiple_organelles_part1.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(os.path.join(output_dir, "multiple_organelles_3d_part1.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
 
 # Create the second figure with a 2x2 grid plus 1 in the third row
@@ -165,7 +165,7 @@ def create_figure2(num_organelles, organelle_names, output_dir):
             if index < num_organelles:
                 ax = big_axes[i, j]
                 ax.axis('off')
-                image_path = os.path.join(output_dir, f"{organelle_names[index]}.png")
+                image_path = os.path.join(output_dir, f"{organelle_names[index]}_3d.png")
                 if os.path.exists(image_path):
                     img = plt.imread(image_path)
                     ax.imshow(img)
@@ -182,20 +182,23 @@ def create_figure2(num_organelles, organelle_names, output_dir):
     #         ax.imshow(img)
     #     big_axes[1, 1].axis('off')  # Hide the second cell in the third row
 
-    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 2', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 2', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
-    plt.savefig(os.path.join(output_dir, "multiple_organelles_part2.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(os.path.join(output_dir, "multiple_organelles_3d_part2.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
 
 # Directory to save individual plots
 output_dir = "../figures"
 os.makedirs(output_dir, exist_ok=True)
 organelle_names = []
+
+image_index = 0
+
 # Generate and save individual organelle plots
 for param in params:
     print(param["organelle"])
     organelle_names.append(param["organelle"])
-    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
+    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}_3d.png'.format(param["organelle"])))
 
 # Create the first figure with the first 6 organelles
 create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)

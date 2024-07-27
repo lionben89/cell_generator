@@ -10,11 +10,11 @@ import os
 from utils import get_weights
 
 #Methods to predict and compare to GT
-gv.model_type = "MG"
+gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "../mg_model_er_13_05_24_1.5"
+gv.model_path = "../mg_model_ne_13_05_24_1.5_inst5"#../mg_model_unet_13_05_24_1.5"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
@@ -31,7 +31,7 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
+    # gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
     gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
@@ -155,7 +155,7 @@ elif (gv.model_type == "CLF"):
         
 elif (gv.model_type == "UNET"):
     # images = [1]
-    images = range(min(10,test_dataset.df.get_shape()[0]))
+    images = range(15,17)#range(min(10,test_dataset.df.get_shape()[0]))
     unet = keras.models.load_model(gv.model_path)
     if (not os.path.exists("{}/predictions".format(gv.model_path))):
         os.makedirs("{}/predictions".format(gv.model_path))
@@ -193,9 +193,9 @@ elif (gv.model_type == "UNET"):
                 input_image = ImageUtils.normalize(input_image,max_value=1.0,dtype=np.float32)
                 pred_image = ImageUtils.normalize(pred_image,max_value=1.0,dtype=np.float32)
             else:
-                target_image = ImageUtils.normalize_std(target_image,max_value=1.0,dtype=np.float32)
-                input_image = ImageUtils.normalize_std(input_image,max_value=1.0,dtype=np.float32)
-                pred_image = ImageUtils.normalize_std(pred_image,max_value=1.0,dtype=np.float32)
+                target_image = ImageUtils.normalize_std(target_image)
+                input_image = ImageUtils.normalize_std(input_image)
+                pred_image = ImageUtils.normalize_std(pred_image)
         
         i=0
         j=0

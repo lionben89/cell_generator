@@ -120,7 +120,7 @@ def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10
             normal_noise = tf.random.normal(tf.shape(input_patchs),stddev=noise_scale,dtype=tf.float64)
             
             ## Create noisy input and predict unet
-            input_patchs_p = 0.5*input_patchs+0.5*normal_noise
+            input_patchs_p = input_patchs+normal_noise
             unet_noise_patchs_p = predict(model,input_patchs_p.numpy(),batch_size,gv.patch_size)
     
             ## Back to image 
@@ -153,6 +153,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
                     "mask" - by external mask - used to evaluate gradcam, guided back propagation and manual validations 
                     "regular" - use the importance mask as is without binary th, if manual_th is not "full" then use the manual_th value
         mask_image (np ndarray, optional): if mode == "mask" then this is the mask to use. Defaults to None. values are 0 or 255
+        mask_mode_pred_path (str): if mode == "mask" then this is the path for data to be saved
         manual_th (str, float optional): _description_. Defaults to "full".
         save_image (bool, int optional): if True save all images, if False save nothing, if int, save the first images according to the int. Defaults to True.
         save_histo (bool, optional): Save histograms of the importance masks. Defaults to False.
@@ -163,7 +164,8 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
     ##Load model
     if model is None:
         print("Loading model:",model_path)
-    model = keras.models.load_model(model_path)
+        model = keras.models.load_model(model_path)
+        
     ## Create thresholds
     num_bins = 10 # number of bins for the histogram
     ths_start = 0.0
@@ -176,9 +178,9 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
     elif mode=="loo":
         pred_path = "predictions_loo"
     elif mode=="mask":
-        pred_path = "predictions_masked/gc"  
-        # ths = [0.0]
-        ths=[0.0,0.0000125,0.000025,0.00005,0.000075,0.0001,0.00015,0.0002,0.00025,0.0003,0.0004,0.008]
+        pred_path = "predictions_masked/manual"  
+        ths = [0.5]
+        # ths=[0.0,0.0000125,0.000025,0.00005,0.000075,0.0001,0.00015,0.0002,0.00025,0.0003,0.0004,0.008]
     elif mode=="regular":
         pred_path="predictions"
         ths=[manual_th]
@@ -288,11 +290,11 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
                     create_dir_if_not_exist(base_save)
                 if mode=="mask" and mask_image is not None:
                     # mask_image_ndarray = target_seg_image
-                    
-                    mask_image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(mask_image))/255.
-                    mask_image_ndarray = np.expand_dims(mask_image_ndarray[0],axis=-1)
-                    mask_image_ndarray = slice_image(mask_image_ndarray,slice_by)
-                    
+                    if type(mask_image) == str:
+                        mask_image_ndarray = ImageUtils.image_to_ndarray(ImageUtils.imread(mask_image))/255.
+                    else:
+                        mask_image_ndarray = mask_image/255.
+                        
                     ## mask_p = (1. - mask_image_ndarray*0.0)
                     mask_p = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
                     mask_p_binary = tf.cast(tf.where(mask_image_ndarray>=th,1.0,0.0),tf.float64).numpy()
@@ -651,8 +653,8 @@ def analyze_predictions(organelle,save_image=True,compound=None,is_vehicle=False
         model (model, optional): model if exists, if None method will load model from model_path. Defaults to None.
     """
     if model is None:
-        print("Loading model:",param["model"])
-        model = keras.models.load_model(param["model"])
+        print("Loading model:",model_path)
+        model = keras.models.load_model(model_path)
         
     ## Create main dir and organelle subdir
     pred_path = "predictions"

@@ -15,16 +15,16 @@ gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_dna_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_ne_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_dna_13_05_24_3.0"
+gv.model_path = "../mg_model_ne_13_05_24_1.5_loss_weight_2.0_no_target"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "DNA" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -105,7 +105,7 @@ elif (gv.model_type == "AE"):
         ae_pt = keras.models.load_model(gv.model_path)
         model.set_weights(ae_pt.get_weights())
         
-    model.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(5,ae)])    
+    model.fit(train_dataset, epochs=gv.number_epochs, callbacks=[SaveModelCallback(5,model)])    
 
 elif (gv.model_type == "UNET"):
     from models.UNETO import *
@@ -154,9 +154,9 @@ elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
     
-    target_loss_weight = 2.0 #2.0 is the default value 
-    mask_loss_weight=1.0 #1.0 is the default value 
-    noise_scale = 3.0 #value according to find_noise_scale
+    target_loss_weight = 0.0 #2.0 is the default value 
+    mask_loss_weight=2.0 #1.0 is the default value 
+    noise_scale = 1.5 #value according to find_noise_scale
     
     #The default target score calculation is regular PCC, if one wish to use weighted PCC uncomment the line below
     weighted_pcc = False
@@ -192,7 +192,7 @@ elif (gv.model_type == "MG"):
     print("noise_scale: ",noise_scale)
     print("target_loss_weight:",target_loss_weight)
     
-    early_stop_callback = keras.callbacks.EarlyStopping(patience=7, restore_best_weights=True, monitor="val_total_loss")
+    early_stop_callback = keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True, monitor="val_total_loss")
     # weight_loss_adaptor_callback = ChangeWeightLossCallbackMaskInterpreter()
     model.compile(g_optimizer = keras.optimizers.Adam(learning_rate=0.0001),mask_loss_weight=mask_loss_weight,noise_scale=noise_scale,target_loss_weight=target_loss_weight,run_eagerly=True)
     losses = model.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback])  #weight_loss_adaptor_callback

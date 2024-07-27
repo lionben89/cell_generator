@@ -7,9 +7,9 @@
 
 #SBATCH --partition main			### specify partition name where to run a job. main: all nodes; gtx1080: 1080 gpu card nodes; rtx2080: 2080 nodes; teslap100: p100 nodes; titanrtx: titan nodes
 #SBATCH --time 4-10:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name train.py			### name of the job
+#SBATCH --job-name choose_noise			### name of the job
 #SBATCH --output choose_noise-%J.out			### output log for running job - %J for job number
-#SBATCH --gpus=1				### number of GPUs, allocating more than 1 requires IT team's permission. Example to request 3090 gpu: #SBATCH --gpus=rtx_3090:1
+#SBATCH --gpus=rtx_3090:1				### number of GPUs, allocating more than 1 requires IT team's permission. Example to request 3090 gpu: #SBATCH --gpus=rtx_3090:1
 ##SBATCH --exclude=dt-gpu-03,cs-1080-05,cs-1080-02,cs-1080-01,cs-1080-03,,cs-1080-04,ise-gpu-02,cs-6000-02,cs-gpu-01,cs-gpu-02
 
 # Note: the following 4 lines are commented out
@@ -29,4 +29,4 @@ module load anaconda              ### load anaconda module
 source activate cell_generator_new        ### activating environment, environment must be configured before running the job
 export PYTHONUNBUFFERED=TRUE 
 cd /sise/home/lionb/cell_generator
-python /sise/home/lionb/cell_generator/figures/1_choose_noise.py
+python /sise/home/lionb/cell_generator/figures/1_choose_noise_scale.py

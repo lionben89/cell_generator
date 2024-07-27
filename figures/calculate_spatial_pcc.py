@@ -66,12 +66,11 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
     if model is None:
         print("Loading model:",model_path)
         model = keras.models.load_model(model_path)
-        
-    dir_path = "{}/spatial_pcc".format(model_path)
-    create_dir_if_not_exist(dir_path)
 
     count=0
     for image_index in images:
+        dir_path = "{}/spatial_pcc/{}".format(model_path,image_index)
+        create_dir_if_not_exist(dir_path)
         count+=1
         print("image index: {}/{}".format(count,len(images)))
         
@@ -114,7 +113,6 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         
         ## Back to image 
         unet_p,mask_p_full,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,mask_patchs_p,np.ones_like(mask_patchs_p)],weights,input_image.shape,gv.patch_size,xy_step,z_step)
-        del unet_patchs_p
         mask_p = mask_p_full/d
         
         ## Create noise vector
@@ -128,24 +126,31 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         ## Back to image 
         input_p,unet_noise_p = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[input_patchs_p,unet_noise_patchs_p],weights,input_image.shape,gv.patch_size,xy_step,z_step)
         ImageUtils.imsave((unet_p/d).astype(np.float16),"{}/unet_prediction_{}.tiff".format(dir_path,image_index)) 
-        ImageUtils.imsave((unet_noise_p/d).astype(np.float16),"{}/unet_noise_prediction_{}.tiff".format(dir_path,image_index)) 
+        ImageUtils.imsave((unet_noise_p/d).astype(np.float16),"{}/unet_noise_prediction_{}.tiff".format(dir_path,image_index))
+        ImageUtils.imsave((target_image).astype(np.float16),"{}/target_{}.tiff".format(dir_path,image_index)) 
         
+        del unet_patchs_p
         del input_patchs_p      
         del unet_noise_patchs_p
         del input_p
-        del unet_noise_p
         del normal_noise
         del input_patchs
         del mask_patchs_p_term
         del mask_noise_patchs
-        del mask_patchs_p_term
         
         prediction_to_gt_spatial_pcc = calculate_spatial_pcc(target_image,unet_p/d)
         ImageUtils.imsave(prediction_to_gt_spatial_pcc,"{}/prediction_to_gt_spatial_pcc_{}.tiff".format(dir_path,image_index))
         
         prediction_to_noisy_spatial_pcc = calculate_spatial_pcc(unet_noise_p/d,unet_p/d)
         ImageUtils.imsave(prediction_to_noisy_spatial_pcc,"{}/prediction_to_noisy_spatial_pcc_{}.tiff".format(dir_path,image_index))
-
+        
+        pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:],target_seg_image_dilated)
+        pcc_gt = pearson_corr((unet_p/d)[:,:,:], (target_image)[:,:,:],target_seg_image_dilated)
+        print("pearson corr for with noisy image:{} is :{}".format(image_index,pcc))
+        print("pearson corr for gt image:{} is :{}".format(image_index,pcc_gt))
+        
+        del unet_p
+        del unet_noise_p
         
 
 for param in params:
@@ -153,9 +158,9 @@ for param in params:
         print(param["model"])
         base_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/spatial_pcc/{}".format(param["model"].split('/')[-1])
         create_dir_if_not_exist(base_path)
-        ds_path = "{}/image_list.csv".format(base_path)
-        dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
+        ds_path = "{}/image_list_good.csv".format(base_path)
+        dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='combined_image_storage_path')
         print("# images in dataset:",dataset.df.data.shape[0])  
-        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=range(min(10,dataset.df.data.shape[0])),weighted_pcc=False,noise_scale=param["noise"])            
+        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=range(0,min(300,dataset.df.data.shape[0]),1),weighted_pcc=False,noise_scale=param["noise"])            
     except Exception as e:
         print(e)

@@ -30,12 +30,10 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv")
+    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
 
     # List of columns to plot unique values for
-    columns_to_plot = ['WellName', 'Workflow', 'ColonyPosition', 'Passage', 
-                       'InstrumentId', 'CellLine', 'CellPopulationId', 
-                       'Clone', 'DataSetId', 'PlateId']
+    columns_to_plot = ['Workflow']
 
     # Calculate the number of unique values for each column
     unique_values_counts = {column: metadata_with_efficacy_scores_df[column].nunique() for column in columns_to_plot}
@@ -59,61 +57,78 @@ else:
 
 # List of columns with the results to plot
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
-          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
-          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
-          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
-          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5},
-          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
-          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
-          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
-          ]
+    {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
+    {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
+    {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
+    {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
+    {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
+    {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5},
+    {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
+    {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
+    {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
+    {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
+]
 
 # Function to plot box plots for each column and result
 def plot_box_plots(data, columns, params):
-    for param in tqdm(params):
-        ## Collect training and testing data for the model
-        control_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_with_metadata__with_efficacy_scores_full.csv".format(param["organelle"]))
-        for x_col in columns:
-            plt.figure(figsize=(30, 6))
+    colors = ['lightblue', 'green', 'blue', 'lightyellow', 'lightgray',  'lightyellow',  'lightgoldenrodyellow', 'lightsteelblue', 'lavender', 'honeydew']
+
+    for x_col in tqdm(columns):
+        fig, axes = plt.subplots(len(params), 1, figsize=(12, len(params) * 6))
+        fig.suptitle(f'Comparison of {x_col} across different models', fontsize=16)
+        for idx, param in enumerate(params):
+            if param["organelle"] == "DNA":
+                control_organelle = "Nucleolus-(Granular-Component)"
+            else:
+                control_organelle = param["organelle"]
+                
+            train_test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv")
+            test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
+            control_df = pd.merge(train_test_df,test_df['path_tiff'],how='inner',left_on='combined_image_storage_path', right_on='path_tiff')
+            control_structure = control_df['StructureShortName'].values[0]
+            ax = axes[idx]
+            
             unique_values = np.sort(data[x_col].unique())
-            groups = [data[data[x_col] == val][param["model"]].dropna() for val in unique_values]
+            data_no_control = data[data['StructureShortName'] != control_structure]
+            groups = [data_no_control[data_no_control[x_col] == val][param["model"]].dropna() for val in unique_values]
             control_values = control_df[param["model"]].dropna()
             
-            # Calculate the lower and upper bounds for the control group without outliers
-            q1 = np.percentile(control_values, 25)
-            q3 = np.percentile(control_values, 75)
-            iqr = q3 - q1
-            lower_bound = q1 - 1.5 * iqr
-            upper_bound = q3 + 1.5 * iqr
-            
-            control_values_no_outliers = control_values[(control_values >= lower_bound) & (control_values <= upper_bound)]
-            lower_bound_no_outliers = np.min(control_values_no_outliers)
-            upper_bound_no_outliers = np.max(control_values_no_outliers)
+            # Calculate fold change and p-values
+            fold_changes = [np.median(group) / np.median(control_values) for group in groups]
+            p_values = [mannwhitneyu(group, control_values, alternative='less').pvalue for group in groups]
             
             # Add control values to the groups
             groups.append(control_values)
-            labels = list(unique_values) + ['Train set + Test set']
-            
-            # Perform significance tests against the lower bound without outliers
-            for i, group in enumerate(groups[:-1]):
-                stat, p_value = mannwhitneyu(group, control_values_no_outliers, alternative='less')
-                if p_value < 0.05 and np.median(group) < lower_bound_no_outliers:
-                    plt.text(i + 1, np.median(group), '**', ha='center', va='bottom', color='blue', fontsize=14)
+            labels = []
+            for i in range(len(list(unique_values))): 
+                label = unique_values[i]
+                labels.append(f'{label}\nmedian:{np.median(groups[i]):.2f}')
+            labels.append(f'Test set\nmedian:{np.median(control_values):.2f}\n[{control_df[x_col].values[0]}]')
             
             y_col = param["model"][3:]
-            plt.boxplot(groups, labels=labels)
-            plt.axhline(lower_bound_no_outliers, color='green', linestyle='--')
-            plt.axhline(upper_bound_no_outliers, color='green', linestyle='--')
-            plt.ylim(0.5, max(upper_bound_no_outliers, max([group.max() for group in groups])) + 0.1)
-            plt.title(f"{x_col} vs {y_col} mask efficacy")
-            plt.xlabel(x_col)
-            plt.ylabel(y_col)
-            plt.xticks(rotation=90, ha='right')
-            plt.tight_layout()
-            plt.savefig('/sise/home/lionb/figures/{}_vs_{}.png'.format(y_col, x_col))
-            plt.close()
+            box = ax.boxplot(groups, labels=labels, patch_artist=True, vert=False)
+            
+            # Color the box plots
+            for patch, color in zip(box['boxes'], colors[:len(groups)]):
+                patch.set_facecolor(color)
+            
+            ax.set_xlim(0.4, max(np.max(control_values), max([group.max() for group in groups])) + 0.2)
+            ax.set_title(f"{param['organelle']} vs {y_col} mask efficacy")
+            ax.set_ylabel(x_col)
+            ax.set_xlabel(y_col)
+            ax.tick_params(axis='y', rotation=0)
+
+            # Annotate fold change and p-values
+            for i, (fold_change, p_value) in enumerate(zip(fold_changes, p_values)):
+                text_x = max(np.max(control_values), max([group.max() for group in groups])) + 0.01
+                if p_value < 0.05 and np.median(groups[i]) < np.median(control_values):
+                    ax.text(text_x, i + 1.25, '**', ha='left', va='center', color='blue', fontsize=14)
+                label = f"FC={fold_change:.2f}\np-value={p_value:.2g}"
+                ax.text(text_x, i + 1, label, ha='left', va='center', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison.png')
+        plt.close()
 
 # Plot box plots for each specified column and result column
 plot_box_plots(metadata_with_efficacy_scores_df, columns_to_plot, params)

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import mannwhitneyu
+import math
+from figure_config import figure_config
 
 # Define the path to your CSV files
 path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
@@ -58,7 +60,6 @@ else:
 # List of columns with the results to plot
 params = [
     {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
-    {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
     {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
     {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
     {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
@@ -67,16 +68,27 @@ params = [
     {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
     {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
     {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
+    {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
 ]
 
-# Function to plot box plots for each column and result
+# Function to plot box plots in a dynamic grid layout based on the number of params
 def plot_box_plots(data, columns, params):
-    colors = ['lightblue', 'green', 'blue', 'lightyellow', 'lightgray',  'lightyellow',  'lightgoldenrodyellow', 'lightsteelblue', 'lavender', 'honeydew']
-
+    colors = ['lightblue', 'green', 'blue', 'lightyellow', 'lightgray', 'lightyellow', 'lightgoldenrodyellow', 
+              'lightsteelblue', 'lavender', 'honeydew', 'gray', 'green', 'yellow', 'orange', 'pink', 'brown']
+    
     for x_col in tqdm(columns):
-        fig, axes = plt.subplots(len(params), 1, figsize=(12, len(params) * 6))
-        fig.suptitle(f'Comparison of {x_col} across different models', fontsize=16)
+        num_plots = len(params)
+        num_cols = 2
+        num_rows = math.ceil(num_plots / num_cols)  # Dynamically calculate rows based on 3 columns
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(12,num_rows*4))  # Adjust figure size based on rows
+        fig.suptitle(f'Mask efficacy by {x_col}', fontsize=figure_config["title"], fontname=figure_config["font"],y=0.98)
+        plt.subplots_adjust(hspace=0.1, wspace=0.05)
+        
         for idx, param in enumerate(params):
+            row = idx // num_cols
+            col = idx % num_cols
+            ax = axes[row, col] if num_rows > 1 else axes[col]  # Handle single row case
+            
             if param["organelle"] == "DNA":
                 control_organelle = "Nucleolus-(Granular-Component)"
             else:
@@ -84,12 +96,11 @@ def plot_box_plots(data, columns, params):
                 
             train_test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv")
             test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
-            control_df = pd.merge(train_test_df,test_df['path_tiff'],how='inner',left_on='combined_image_storage_path', right_on='path_tiff')
+            control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
-            ax = axes[idx]
             
-            unique_values = np.sort(data[x_col].unique())
             data_no_control = data[data['StructureShortName'] != control_structure]
+            unique_values = np.sort(data_no_control[x_col].unique())
             groups = [data_no_control[data_no_control[x_col] == val][param["model"]].dropna() for val in unique_values]
             control_values = control_df[param["model"]].dropna()
             
@@ -99,35 +110,42 @@ def plot_box_plots(data, columns, params):
             
             # Add control values to the groups
             groups.append(control_values)
-            labels = []
-            for i in range(len(list(unique_values))): 
-                label = unique_values[i]
-                labels.append(f'{label}\nmedian:{np.median(groups[i]):.2f}')
+            labels = [f'{val}\nmedian:{np.median(groups[i]):.2f}' for i, val in enumerate(unique_values)]
             labels.append(f'Test set\nmedian:{np.median(control_values):.2f}\n[{control_df[x_col].values[0]}]')
             
             y_col = param["model"][3:]
-            box = ax.boxplot(groups, labels=labels, patch_artist=True, vert=False)
+            box = ax.boxplot(groups, labels=labels, patch_artist=True, vert=True)
             
             # Color the box plots
             for patch, color in zip(box['boxes'], colors[:len(groups)]):
                 patch.set_facecolor(color)
             
-            ax.set_xlim(0.4, max(np.max(control_values), max([group.max() for group in groups])) + 0.2)
-            ax.set_title(f"{param['organelle']} vs {y_col} mask efficacy")
-            ax.set_ylabel(x_col)
-            ax.set_xlabel(y_col)
-            ax.tick_params(axis='y', rotation=0)
+            ax.set_ylim(0.4, max(np.max(control_values), max([group.max() for group in groups])) + 0.2)
+            ax.set_title(f"{param['organelle']}",fontsize=figure_config["organelle"], fontname=figure_config["font"])
+            # ax.set_xlabel(x_col,fontsize=figure_config["text"], fontname=figure_config["font"])
+            if col == 0:
+                ax.set_ylabel('mask efficacy [PCC]',fontsize=figure_config["axis"], fontname=figure_config["font"])
+            else:
+                # Turn off y-axis
+                ax.get_yaxis().set_visible(False)
+            
+            ax.tick_params(axis='y', rotation=90)
+            ax.tick_params(axis='x', rotation=0)
 
             # Annotate fold change and p-values
             for i, (fold_change, p_value) in enumerate(zip(fold_changes, p_values)):
-                text_x = max(np.max(control_values), max([group.max() for group in groups])) + 0.01
-                if p_value < 0.05 and np.median(groups[i]) < np.median(control_values):
-                    ax.text(text_x, i + 1.25, '**', ha='left', va='center', color='blue', fontsize=14)
+                text_y = max(np.max(control_values), max([group.max() for group in groups])) + 0.11
+                if p_value < 0.01 and np.median(groups[i]) < np.median(control_values):
+                    ax.text(i + 1,text_y+0.05, '**', ha='center', va='top', color='blue', fontsize=14, fontname=figure_config["font"])
                 label = f"FC={fold_change:.2f}\np-value={p_value:.2g}"
-                ax.text(text_x, i + 1, label, ha='left', va='center', fontsize=12, fontweight='bold')
+                ax.text(i + 1,text_y+0.02, label, ha='center', va='top', fontsize=figure_config["text"], fontname=figure_config["font"])
+        
+        # Remove any empty subplots
+        for idx in range(num_plots, num_rows * num_cols):
+            fig.delaxes(axes.flatten()[idx])
         
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison.png')
+        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison_all.png',dpi=300, bbox_inches='tight')
         plt.close()
 
 # Plot box plots for each specified column and result column

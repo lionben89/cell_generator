@@ -5,6 +5,7 @@ from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
 import pandas as pd
+from figure_config import figure_config
 
 params = [
     {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slice":28},
@@ -91,53 +92,53 @@ def overlay_images(input_image, mask_image, seg_gt_image):
 # Create plot for a single organelle
 def plot_organelle(image_index, param, save_path):
     # Create a figure with a tight layout
-    fig = plt.figure(figsize=(8, 12))
-    gs = gridspec.GridSpec(3, 2, height_ratios=[2, 1, 1], width_ratios=[1, 1])
-    gs.update(wspace=0.01, hspace=0.01)  # Minimal space between images
+    fig = plt.figure(figsize=(22, 8))
+    gs = gridspec.GridSpec(2, 3, height_ratios=[1, 1], width_ratios=[2, 1, 1])
+    gs.update(wspace=0.01, hspace=0.05)  # Minimal space between images
     
     input_image, mask_image, prediction_original, prediction_noisy, ground_truth, seg_ground_truth, slice_index = collect_images(param, image_index)
     mask_seg_gt_overlay = overlay_images(input_image, mask_image, seg_ground_truth)
     
     # Add a title with the organelle name, closer to the images
-    fig.text(0.5,0.98,param["organelle"], fontsize=16, color='black', ha='center', va='top')
+    fig.text(0.5,0.98,param["organelle"], fontsize=figure_config["organelle"],fontname=figure_config["font"], color='black', ha='center', va='top')
     
     #Add subtitle
     mean_pcc = pd.read_csv("{}/predictions_agg/pcc_resuls.csv".format(param["model"]))["{0:.1f}".format(param["th"])].mean()
     mask_size = 1- (pd.read_csv("{}/predictions_agg/mask_size_resuls.csv".format(param["model"]))["{0:.1f}".format(param["th"])].mean())
-    fig.text(0.5,0.95,"TH={:.1f}, Mask efficacy={:.2f}[PCC], Mean noise vol.={:.2f}%".format(param["th"],mean_pcc,mask_size*100), fontsize=14, color='black', ha='center', va='top')
+    fig.text(0.5,0.95,"TH={:.1f}, Mask efficacy={:.2f}[PCC], Mean noise vol.={:.2f}%".format(param["th"],mean_pcc,mask_size*100), fontsize=14,fontname=figure_config["font"], color='black', ha='center', va='top')
     
     # Adjust subplot parameters to bring title closer to images
-    plt.subplots_adjust(top=0.93)
+    plt.subplots_adjust(top=0.92)
 
     # Add the first image at the top (100% width, 50% height)
-    ax1 = plt.subplot(gs[0, :])
+    ax1 = plt.subplot(gs[:, 0])
     ax1.imshow(mask_seg_gt_overlay)
     ax1.axis('off')  # Hide axes
-    ax1.text(0.05, 0.95, "Input Image + Mask overlay + GT segmentation", transform=ax1.transAxes, fontsize=12, color='white', ha='left', va='top')
+    ax1.text(0.05, 0.95, "Input Image + Mask overlay + GT segmentation", transform=ax1.transAxes, fontsize=14,fontname=figure_config["font"], fontweight="bold",color='white', ha='left', va='top')
 
     # Add the second image at the bottom left (50% width, 25% height)
-    ax2 = plt.subplot(gs[1, 0])
+    ax2 = plt.subplot(gs[0, 1])
     ax2.imshow(input_image, cmap='gray')
     ax2.axis('off')
-    ax2.text(0.05, 0.95, "Input Image", transform=ax2.transAxes, fontsize=12, color='white', ha='left', va='top')
+    ax2.text(0.05, 0.95, "Input Image", transform=ax2.transAxes, fontsize=14,fontname=figure_config["font"], fontweight="bold",color='white', ha='left', va='top')
 
     # Add the third image at the bottom right (50% width, 25% height)
-    ax3 = plt.subplot(gs[1, 1])
+    ax3 = plt.subplot(gs[0, 2])
     ax3.imshow(ground_truth, cmap='gray')
     ax3.axis('off')
-    ax3.text(0.05, 0.95, "Ground Truth", transform=ax3.transAxes, fontsize=12, color='white', ha='left', va='top')
+    ax3.text(0.05, 0.95, "Ground Truth", transform=ax3.transAxes, fontsize=14,fontname=figure_config["font"],fontweight="bold", color='white', ha='left', va='top')
 
     # Add the fourth image at the very bottom left (50% width, 25% height)
-    ax4 = plt.subplot(gs[2, 0])
+    ax4 = plt.subplot(gs[1, 1])
     ax4.imshow(prediction_noisy, cmap='gray')
     ax4.axis('off')
-    ax4.text(0.05, 0.95, "Noisy Prediction", transform=ax4.transAxes, fontsize=12, color='white', ha='left', va='top')
+    ax4.text(0.05, 0.95, "Noisy Prediction", transform=ax4.transAxes, fontsize=14,fontname=figure_config["font"],fontweight="bold", color='white', ha='left', va='top')
 
     # Add the fifth image at the very bottom right (50% width, 25% height)
-    ax5 = plt.subplot(gs[2, 1])
+    ax5 = plt.subplot(gs[1, 2])
     ax5.imshow(prediction_original, cmap='gray')
     ax5.axis('off')
-    ax5.text(0.05, 0.95, "Prediction", transform=ax5.transAxes, fontsize=12, color='white', ha='left', va='top')
+    ax5.text(0.05, 0.95, "Prediction", transform=ax5.transAxes, fontsize=14,fontname=figure_config["font"],fontweight="bold", color='white', ha='left', va='top')
 
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close(fig)

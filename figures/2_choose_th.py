@@ -8,6 +8,7 @@ from dataset import DataGen
 import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from mg_analyzer import analyze_th
+from figure_config import figure_config
 
 params = [
           {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
@@ -30,7 +31,7 @@ weighted_pcc = False
 
 def plot_th_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.87
-    fig, axs = plt.subplots(3,4, figsize=(18, 12))  # 3x3 grid of subplots
+    fig, axs = plt.subplots(4,3, figsize=(18, 18))  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -46,9 +47,9 @@ def plot_th_analysis():
             # Plotting
             ax.plot(ths, pcc, label='Model Prediction Quality')
             ax.axhline(y=0.87, color='r', linestyle='--', label='Threshold: PCC=0.87')
-            ax.set_title(params[i]["organelle"])
-            ax.set_xlabel('TH')
-            ax.set_ylabel('PCC')
+            ax.set_title(params[i]["organelle"],fontsize=figure_config["organelle"], fontname=figure_config["font"])
+            ax.set_xlabel('TH',fontsize=figure_config["axis"], fontname=figure_config["font"])
+            ax.set_ylabel('PCC',fontsize=figure_config["axis"], fontname=figure_config["font"])
             # Find the first x-value where PCC < 0.2 and annotate
             over_threshold = ths[pcc > 0.87]
             if over_threshold.size > 0:  # Check if there's any value below the threshold
@@ -63,7 +64,7 @@ def plot_th_analysis():
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
-    plt.suptitle('Effect of TH the mask on Model Prediction from Noisy Input', fontsize=16)
+    plt.suptitle('Effect of TH the mask on Model Prediction from Noisy Input',fontsize=figure_config["title"], fontname=figure_config["font"])
     plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
     plt.savefig("../figures/find_th.png")
 

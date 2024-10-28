@@ -14,14 +14,14 @@ gv.model_type = "UNET"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "../mg_model_ne_13_05_24_1.5_inst5"#../mg_model_unet_13_05_24_1.5"
+gv.model_path = "../unet_model_22_05_22_microtubules_128"#../mg_model_unet_13_05_24_1.5"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to predict the model upon
-gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Endosomes" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
@@ -155,15 +155,15 @@ elif (gv.model_type == "CLF"):
         
 elif (gv.model_type == "UNET"):
     # images = [1]
-    images = range(15,17)#range(min(10,test_dataset.df.get_shape()[0]))
+    images = range(min(3,test_dataset.df.get_shape()[0]))
     unet = keras.models.load_model(gv.model_path)
     if (not os.path.exists("{}/predictions".format(gv.model_path))):
         os.makedirs("{}/predictions".format(gv.model_path))
     pcc = 0
     for image_index in images:        
         # image_index = 1
-        if (not os.path.exists("{}/predictions/{}".format(gv.model_path,image_index))):
-            os.makedirs("{}/predictions/{}".format(gv.model_path,image_index))
+        if (not os.path.exists("{}/predictions_pipe44/{}".format(gv.model_path,image_index))):
+            os.makedirs("{}/predictions_pipe44/{}".format(gv.model_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
@@ -232,9 +232,9 @@ elif (gv.model_type == "UNET"):
         input_cut = (input_image)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         # nuc_seg_cut = (nuc_seg)[:-1*(prediction.shape[0]%od),:-1*(prediction.shape[1]%o),:-1*(prediction.shape[2]%o)]
         
-        ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions/{}/input_patch_{}.tiff".format(gv.model_path,image_index,image_index))
-        ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions/{}/target_patch_{}.tiff".format(gv.model_path,image_index,image_index))
-        ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions/{}/prediction_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        ImageUtils.imsave(input_cut.astype(np.float16),"{}/predictions_pipe44/{}/input_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        ImageUtils.imsave(target_cut.astype(np.float16),"{}/predictions_pipe44/{}/target_patch_{}.tiff".format(gv.model_path,image_index,image_index))
+        ImageUtils.imsave(prediction_cut.astype(np.float16),"{}/predictions_pipe44/{}/prediction_patch_{}.tiff".format(gv.model_path,image_index,image_index))
         # ImageUtils.imsave(nuc_seg_cut.astype(np.float16),"{}/predictions/{}/nuc_seg_patch_{}.tiff".format(gv.model_path,image_index,image_index))
         p=pearson_corr(target_cut, prediction_cut)
         pcc+=p

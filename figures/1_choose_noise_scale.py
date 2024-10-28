@@ -8,6 +8,7 @@ from dataset import DataGen
 import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from mg_analyzer import find_noise_scale
+from figure_config import figure_config
 
 params = [
           {"organelle":"Nuclear-envelope","model":"../unet_model_22_05_22_ne_128"},
@@ -28,7 +29,7 @@ weighted_pcc = False
 
 def plot_noise_scale_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.2
-    fig, axs = plt.subplots(3, 4, figsize=(18, 12))  # 3x3 grid of subplots
+    fig, axs = plt.subplots(4,3, figsize=(18, 18))  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -41,9 +42,9 @@ def plot_noise_scale_analysis():
             # Plotting
             ax.plot(noise_std, pcc, label='Model Prediction Quality')
             ax.axhline(y=0.2, color='r', linestyle='--', label='Threshold: PCC=0.2')
-            ax.set_title(params[i]["organelle"])
-            ax.set_xlabel('Noise Standard Deviation')
-            ax.set_ylabel('PCC')
+            ax.set_title(params[i]["organelle"],fontsize=figure_config["organelle"], fontname=figure_config["font"])
+            ax.set_xlabel('Noise Standard Deviation',fontsize=figure_config["axis"], fontname=figure_config["font"])
+            ax.set_ylabel('PCC',fontsize=figure_config["axis"], fontname=figure_config["font"])
             
             # Find the first x-value where PCC < 0.2 and annotate
             below_threshold = noise_std[pcc < 0.2]
@@ -60,7 +61,7 @@ def plot_noise_scale_analysis():
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
-    plt.suptitle('Effect of Normal Noise Added to Input on Model Prediction by Standard Deviation', fontsize=16)
+    plt.suptitle('Effect of Normal Noise Added to Input on Model Prediction by Standard Deviation', fontsize=figure_config["title"], fontname=figure_config["font"])
     plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
     plt.savefig("../figures/find_noise_scale.png")
 

@@ -7,6 +7,7 @@ import global_vars as gv
 from callbacks import *
 from metrics import *
 import pandas as pd
+from utils import *
 
 CONTINUE_TRAINING = False ## False to override current model with the same name
 
@@ -15,16 +16,16 @@ gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_ne_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_er_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_ne_13_05_24_1.5_loss_weight_2.0_no_target"
+gv.model_path = "../mg_model_er_13_05_24_1.5_loss_weight_2.0_sim_1.0_no_target_mae"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Endoplasmic-reticulum" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -153,7 +154,7 @@ elif (gv.model_type == "UNETP"):
 elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
-    
+    similiarity_loss_weight = 1.0  # 1.0 default
     target_loss_weight = 0.0 #2.0 is the default value 
     mask_loss_weight=2.0 #1.0 is the default value 
     noise_scale = 1.5 #value according to find_noise_scale
@@ -187,7 +188,7 @@ elif (gv.model_type == "MG"):
     # checkpoint callback monitoring "val_stop" decides when to save the epoch, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
     # term and term value make surm that the value of term in the loss is greater then the term value before saving the epoch
     checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.88)
-    
+    print("similiarity_loss_weight: ", similiarity_loss_weight)
     print("mask_loss_weight: ",mask_loss_weight)
     print("noise_scale: ",noise_scale)
     print("target_loss_weight:",target_loss_weight)
@@ -198,6 +199,7 @@ elif (gv.model_type == "MG"):
     losses = model.fit(train_dataset, validation_data=validation_dataset, epochs=100, callbacks=[checkpoint_callback,early_stop_callback])  #weight_loss_adaptor_callback
         
     a = pd.DataFrame(losses.history)
+    create_dir_if_not_exist(gv.model_path)
     a.to_csv("{}/losses.csv".format(gv.model_path))
     
 elif (gv.model_type == "RC"):

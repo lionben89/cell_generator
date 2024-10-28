@@ -5,6 +5,7 @@ from scipy.stats import entropy
 from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
+from figure_config import figure_config
 
 
 params = [
@@ -12,7 +13,7 @@ params = [
           {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[7,19,32,44]},
           {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[7,22,34,48]},
           {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[18,30,44,51]},
-          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[9,23,42,54]},
+          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[19,32,47,54]},
           {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[22,31,44,51]},
           {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[15,30,42,49]},
           {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[9,17,27,35]},
@@ -105,7 +106,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
         # Display the overlay image where input and mask are combined
         overlay_image = overlay_mask(input_image, mask_image)
         axes[0, j].imshow(overlay_image)
-        title = axes[0, j].set_title(f'Slice {slice_index}', fontsize=10, pad=10)  # Increase pad to adjust space below title
+        title = axes[0, j].set_title(f'Slice {slice_index}', fontsize=figure_config["axis"], fontname=figure_config["font"], pad=10)  # Increase pad to adjust space below title
         title.set_position([0.5, 1.05])  # Adjust the title position
 
         # Display prediction images and ground truth
@@ -115,10 +116,10 @@ def plot_organelle(examples_per_organelle, param, save_path):
         
         # Set y-axis labels for the first column
         if j == 0:
-            axes[0, j].set_ylabel('Input+Mask', fontsize=10, rotation=45, labelpad=30)
-            axes[1, j].set_ylabel('Prediction Noisy', fontsize=10, rotation=45, labelpad=30)
-            axes[2, j].set_ylabel('Prediction Original', fontsize=10, rotation=45, labelpad=30)
-            axes[3, j].set_ylabel('Ground Truth', fontsize=10, rotation=45, labelpad=30)
+            axes[0, j].set_ylabel('Input+Mask', fontsize=figure_config["axis"], fontname=figure_config["font"], rotation=45, labelpad=30)
+            axes[1, j].set_ylabel('Prediction Noisy', fontsize=figure_config["axis"], fontname=figure_config["font"], rotation=45, labelpad=30)
+            axes[2, j].set_ylabel('Prediction Original', fontsize=figure_config["axis"], fontname=figure_config["font"], rotation=45, labelpad=30)
+            axes[3, j].set_ylabel('Ground Truth', fontsize=figure_config["axis"], fontname=figure_config["font"], rotation=45, labelpad=30)
 
     # Adjust axis visibility
     for ax in axes.flat:
@@ -126,7 +127,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
         ax.yaxis.label.set_visible(True)
         ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)   
     
-    fig.suptitle(f"{param['organelle']}, TH={param['th']}", fontsize=16, y=0.92)
+    fig.suptitle(f"{param['organelle']}, TH={param['th']}", fontsize=figure_config["organelle"], fontname=figure_config["font"], y=0.92)
     plt.subplots_adjust(top=0.85)  # Adjust top spacing to accommodate subplot titles
     plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
@@ -149,7 +150,7 @@ def create_figure1(num_organelles, organelle_names, output_dir):
             else:
                 big_axes[i, j].axis('off')
 
-    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 1', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 1', fontsize=14, fontname=figure_config["font"], y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.savefig(os.path.join(output_dir, "multiple_organelles_3d_part1.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
@@ -182,7 +183,7 @@ def create_figure2(num_organelles, organelle_names, output_dir):
     #         ax.imshow(img)
     #     big_axes[1, 1].axis('off')  # Hide the second cell in the third row
 
-    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 2', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Slices per Example - Part 2', fontsize=14, fontname=figure_config["font"], y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.savefig(os.path.join(output_dir, "multiple_organelles_3d_part2.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()

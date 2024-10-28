@@ -4,6 +4,7 @@ from scipy import stats
 from sklearn.neighbors import KernelDensity, NearestNeighbors
 import warnings
 import numbers
+from figure_config import figure_config
 
 def dermi_kde(x, y, x_col="Feature1",y_col="Feature2", n_bins=20, n_mesh=3, plot=True,title=""):
     """Compute Density Resampled Estimate of Mutual Information using KDE."""
@@ -72,11 +73,11 @@ def dermi_kde(x, y, x_col="Feature1",y_col="Feature2", n_bins=20, n_mesh=3, plot
     
         # Plot raw data
         axes[0].scatter(x, y, c="k", s=4)
-        axes[0].set_title("Input\ndata", fontsize=14)
+        axes[0].set_title("Raw scores", fontsize=14, fontname=figure_config["font"])
         axes[0].set_xticks([])
         axes[0].set_yticks([])
-        axes[0].set_xlabel(x_col, fontsize=12)
-        axes[0].set_ylabel(y_col, fontsize=12)
+        axes[0].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
+        axes[0].set_ylabel(y_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot KDE joint density
         n = ((n_mesh + 1) * n_bins) + 1
@@ -89,24 +90,24 @@ def dermi_kde(x, y, x_col="Feature1",y_col="Feature2", n_bins=20, n_mesh=3, plot
             axes[1].axvline(b - 0.5, c="grey", linewidth=1)
         axes[1].set_xticks([])
         axes[1].set_yticks([])
-        axes[1].set_title("KDE\nDensity", fontsize=14)
-        axes[1].set_xlabel(x_col, fontsize=12)
+        axes[1].set_title("KDE Density", fontsize=14, fontname=figure_config["font"])
+        axes[1].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot joint probability
         axes[2].imshow(bin_density, cmap="inferno", origin="lower", aspect="auto")
         axes[2].set_xticks([])
         axes[2].set_yticks([])
-        axes[2].set_title("Joint Prob.\nMI={:.2f}".format(mutual_info), fontsize=14)
-        axes[2].set_xlabel(x_col, fontsize=12)
+        axes[2].set_title("Joint Prob.[MI={:.2f}]".format(mutual_info), fontsize=14, fontname=figure_config["font"])
+        axes[2].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot conditional probability
         axes[3].imshow(rescaled_density, cmap="inferno", origin="lower", aspect="auto")
         axes[3].set_xticks([])
         axes[3].set_yticks([])
-        axes[3].set_title("Conditional Prob.\nDREMI={:.2f}".format(dremi), fontsize=14)
-        axes[3].set_xlabel(x_col, fontsize=12)
+        axes[3].set_title("Conditional Prob.[DREMI={:.2f}]".format(dremi), fontsize=14, fontname=figure_config["font"])
+        axes[3].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
-        fig.suptitle(title, fontsize=16)
+        fig.suptitle(title, fontsize=figure_config["organelle"],fontname=figure_config["font"],y=0.92)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig("/sise/home/lionb/figures/kde_dermi_{}.png".format(title))
 
@@ -181,11 +182,11 @@ def dermi_knn(x, y, x_col="Feature1",y_col="Feature2",k=10, n_bins=20, n_mesh=3,
         
         # Plot raw data
         axes[0].scatter(x, y, c="k", s=4)
-        axes[0].set_title("Input\ndata", fontsize=14)
+        axes[0].set_title("Row scores",fontsize=14, fontname=figure_config["font"])
         axes[0].set_xticks([])
         axes[0].set_yticks([])
-        axes[0].set_xlabel(x_col, fontsize=12)
-        axes[0].set_ylabel(y_col, fontsize=12)
+        axes[0].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
+        axes[0].set_ylabel(y_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot kNN density
         n = ((n_mesh + 1) * n_bins) + 1
@@ -200,28 +201,28 @@ def dermi_knn(x, y, x_col="Feature1",y_col="Feature2",k=10, n_bins=20, n_mesh=3,
 
         axes[1].set_xticks([])
         axes[1].set_yticks([])
-        axes[1].set_title("kNN\nDensity", fontsize=14)
-        axes[1].set_xlabel(x_col, fontsize=12)
+        axes[1].set_title("kNN Density", fontsize=14, fontname=figure_config["font"])
+        axes[1].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot joint probability
         axes[2].imshow(bin_density, cmap="inferno", origin="lower", aspect="auto")
         axes[2].set_xticks([])
         axes[2].set_yticks([])
         axes[2].set_title(
-            "Joint Prob.\nMI={:.2f}".format(mutual_info), fontsize=14
+            "Joint Prob.[MI={:.2f}]".format(mutual_info), fontsize=14, fontname=figure_config["font"]
         )
-        axes[2].set_xlabel(x_col, fontsize=12)
+        axes[2].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
         # Plot conditional probability
         axes[3].imshow(drevi, cmap="inferno", origin="lower", aspect="auto")
         axes[3].set_xticks([])
         axes[3].set_yticks([])
         axes[3].set_title(
-            "Conditional Prob.\nDREMI={:.2f}".format(dremi), fontsize=14
+            "Conditional Prob.[DREMI={:.2f}]".format(dremi), fontsize=14, fontname=figure_config["font"]
         )
-        axes[3].set_xlabel(x_col, fontsize=12)
+        axes[3].set_xlabel(x_col, fontsize=figure_config["axis"], fontname=figure_config["font"])
 
-        fig.suptitle(title, fontsize=16)
+        fig.suptitle(title, fontsize=figure_config["organelle"], fontname=figure_config["font"],y=0.92)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig("/sise/home/lionb/figures/knn_dermi_{}.png".format(title))
 
@@ -241,27 +242,27 @@ def _vector_coerce_two_dense(x, y):
 
 import pandas as pd
 
-# corr_df = pd.read_csv("/sise/home/lionb/cell_generator/figures/membrane_correlation.csv")
-# x_col = '../mg_model_membrane_13_05_24_1.5'
-# x = corr_df[x_col].values
-# y_col = '../unet_model_22_05_22_membrane_128'
-# y = corr_df[y_col].values
-# title = "Plasma-membrane"
-
-corr_df = pd.read_csv("/sise/home/lionb/cell_generator/figures/dna correlation.csv")
-corr_df = corr_df.dropna(how='any')
-x_col = '../mg_model_dna_13_05_24_1.5b'
+corr_df = pd.read_csv("/sise/home/lionb/cell_generator/figures/membrane_correlation.csv")
+x_col = '../mg_model_membrane_13_05_24_1.5'
 x = corr_df[x_col].values
-y_col = '../unet_model_22_05_22_dna_128'
+y_col = '../unet_model_22_05_22_membrane_128'
 y = corr_df[y_col].values
-title = "DNA"
+title = "Plasma-membrane"
+
+# corr_df = pd.read_csv("/sise/home/lionb/cell_generator/figures/dna correlation.csv")
+# corr_df = corr_df.dropna(how='any')
+# x_col = '../mg_model_dna_13_05_24_1.5b'
+# x = corr_df[x_col].values
+# y_col = '../unet_model_22_05_22_dna_128'
+# y = corr_df[y_col].values
+# title = "DNA"
 
 # Plot DREMI with KDE and kNN-DREMI
 print("Plotting DREMI with KDE:")
-dremi_value_kde = dermi_kde(x, y, "Mask Interpreter", "In-silico", n_bins=20, n_mesh=10, plot=True,title=title)
+dremi_value_kde = dermi_kde(x, y, "mask efficacy [PCC]", "UNET prediction vs GT [PCC]", n_bins=20, n_mesh=10, plot=True,title=title)
 
 print("Plotting kNN-DREMI:")
-dremi_value_knn = dermi_knn(x, y, "Mask Interpreter", "In-silico", k=12, n_bins=20, n_mesh=10, n_jobs=2, plot=True,title=title)
+dremi_value_knn = dermi_knn(x, y, "mask efficacy [PCC]", "UNET prediction vs GT [PCC]", k=12, n_bins=20, n_mesh=10, n_jobs=2, plot=True,title=title)
 
 print("DREMI with KDE:", dremi_value_kde)
 print("kNN-DREMI:", dremi_value_knn)

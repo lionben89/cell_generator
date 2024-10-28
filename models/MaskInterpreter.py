@@ -112,7 +112,8 @@ class MaskInterpreter(keras.Model):
 
             importance_mask_loss = tf.reduce_mean(
                tf.reduce_mean(
-                  keras.losses.mean_squared_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
+                #   keras.losses.mean_squared_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
+                  keras.losses.mean_absolute_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
                ),axis=(0,1)
             )
             

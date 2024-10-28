@@ -17,6 +17,7 @@ from scipy.ndimage import zoom
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from figures.figure_config import figure_config
 
 root_dir = "/sise/home/lionb/"
 
@@ -126,7 +127,7 @@ class MaskInterperter:
     
     def __call__(self, input, roi):
         if np.sum(roi)>0:
-            input_tensor = tf.Variable(np.expand_dims(input,axis=0), dtype=tf.float16)
+            input_tensor = tf.Variable(np.expand_dims(input,axis=0), dtype=tf.float32)
             mask = self.model(input_tensor)*roi
             return mask[0].numpy()
         else:
@@ -201,7 +202,7 @@ def _get_weights(shape):
         weights = weights * values[tuple(slicey)]
     return np.broadcast_to(weights, shape_in).astype(np.float32)
 
-def get_noise_prediction(signal,mask,mask_th,unet_model,roi_mode="full",roi_args=None):
+def get_noise_prediction(signal,mask,mask_th,unet_model,roi_mode="full",roi_args=None, noise_scale = 1.5):
     tf.keras.backend.clear_session()
     _ = gc.collect() 
     px_start = 0
@@ -211,7 +212,6 @@ def get_noise_prediction(signal,mask,mask_th,unet_model,roi_mode="full",roi_args
     py_end = signal.shape[2]
     pz_end = signal.shape[0]
     
-    noise_scale = 5.0
     roi = None
     
     roi = get_roi(roi_mode, roi_args, signal)
@@ -380,35 +380,43 @@ def plot_evaluation_graph(fname,noise_levels, scores, interperters_names):
     colors = cmap.colors  # type: list
     ax.set_prop_cycle(color=colors)
     
-    x = noise_levels
+    x = noise_levels*100
     for i in range(len(interperters_names)):
         y = scores[i,:]
         ax.plot(x,y,label=interperters_names[i])
-    ax.set_ylabel('Pearson score')
-    ax.set_xlabel('Noise percentage')
+    ax.set_ylabel('PCC',fontsize=figure_config["axis"],fontname=figure_config["font"])
+    ax.set_xlabel('Noise percentage',fontsize=figure_config["axis"],fontname=figure_config["font"])
     ax.set_title("Pearson scores of different methods with different noise levels")
     plt.savefig(fname)
     plt.legend()
     plt.show()
     
-def plot_evaluation_graph_std(fname,interpreters_names):
+def plot_evaluation_graph_std(fname,interpreters_names,legend=True):
     data = pd.DataFrame({})
     for i in range(len(interpreters_names)):
         scores_long = load_scores(interpreters_names[i])
         data = pd.concat([data,scores_long],axis=0)
-    graph = sns.relplot(data=data, kind="line",x="Noise percentage", y="Pearson",hue="Interpreter")
+    graph = sns.relplot(data=data, kind="line",x="Noise percentage", y="Pearson",hue="Interpreter",legend=legend, aspect=2)
+    # # Conditionally add the legend
+    # if not legend:
+    #     graph._legend.remove()  # Remove the legend if 'legend' is False
+    plt.xlabel("Noise percentage", fontsize=16,fontname=figure_config["font"])
+    plt.ylabel("PCC", fontsize=16,fontname=figure_config["font"])
     graph.figure.savefig(fname)
    
-def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_gradcam):
+def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_gradcam, noise_scale):
+    
+    create_dir_if_not_exist("{}/compare".format(dir_path))
     
     interperters = {
+        "mask_interperter":MaskInterperter(model=mg_model),
         "saliency": Saliency(unet_model),
         "gradcam":GradCam(model=unet_model,target_layer=selected_layer,X_gradcam=X_gradcam),
-        "mask_interperter":MaskInterperter(model=mg_model)
+        
     }
     
     noise_levels = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-    # noise_levels = [0.6,0.7,0.8]
+    # noise_levels = [0.6,0.7]
     
     mean_pcc_results = DatasetMetadataSCV("{}/mean_evaluation_results_pearson.csv".format(dir_path))
     mean_w_pcc_results = DatasetMetadataSCV("{}/mean_evaluation_results_w_pearson.csv".format(dir_path))
@@ -423,9 +431,10 @@ def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_
         w_pcc_results.create_header(noise_levels)  
               
         interpreter = interperters[key]
-        
-        for i in range(10):
-        # for i in [7]:
+        create_dir_if_not_exist("{}/compare/{}".format(dir_path,key))
+        for i in range(min(10,dataset.df.data.shape[0])):
+            base_dir = "{}/compare/{}/{}".format(dir_path,key,i)
+            create_dir_if_not_exist(base_dir)
             print(i)
             pcc = []
             w_pcc = []
@@ -437,8 +446,13 @@ def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_
             prediction_mm =  ImageUtils.normalize(prediction,1.0,np.float32)
 
             _, mask_norm = get_mask(interpreter,signal)
-
+            ImageUtils.imsave((mask_norm).astype(np.float16),"{}/mask_norm_{}.tiff".format(base_dir,i))
+            ImageUtils.imsave((signal).astype(np.float16),"{}/input_{}.tiff".format(base_dir,i))
+            ImageUtils.imsave((prediction_mm).astype(np.float16),"{}/prediction_{}.tiff".format(base_dir,i))
+            ImageUtils.imsave((target).astype(np.float16),"{}/target_{}.tiff".format(base_dir,i))
+            ImageUtils.imsave((target_seg_image).astype(np.float16),"{}/target_seg_{}.tiff".format(base_dir,i))
             for noise_level in noise_levels:
+                print("{}-{}".format(i, noise_level))
                 mask_th = 0.0
                 upper_th = 1.0
                 lower_th = 0.0
@@ -455,11 +469,13 @@ def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_
                         upper_th = mask_th
                         mask_th = mask_th - ((upper_th-lower_th)/2)
                          
-                noise_prediction = get_noise_prediction(signal,mask_norm,real_mask_th,unet_model)
+                noise_prediction = get_noise_prediction(signal,mask_norm,real_mask_th,unet_model, noise_scale = noise_scale)
                 score = pearson_corr(prediction_mm, noise_prediction)
                 pcc.append(score)
                 weight_score = pearson_corr(prediction_mm, noise_prediction,target_seg_image_dilated)
                 w_pcc.append(weight_score)
+                ImageUtils.imsave((np.where(mask_norm>real_mask_th, 1.0, 0.0)).astype(np.float16),"{}/mask_{}_noisevol_{}.tiff".format(base_dir,i,noise_level))
+                ImageUtils.imsave((noise_prediction).astype(np.float16),"{}/noisy_prediction_{}_noisevol_{}.tiff".format(base_dir,i,noise_level))
             pcc_results.add_row(pcc)
             w_pcc_results.add_row(w_pcc)
             
@@ -479,12 +495,20 @@ def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_
     plot_evaluation_graph("{}/mean_evaluation_results_w_pearson.svg".format(dir_path),noise_levels, mean_w_pcc_results.data.values, list(interperters.keys()))
 
 def load_scores(interpreter):
-    scores = pd.read_csv("{}/{}_evaluation_results_pearson.csv".format(gv.mg_model_path,interpreter))
+    scores = pd.read_csv("{}/{}_evaluation_results_pearson.csv".format(gv.model_path,interpreter))
     scores.insert(0,"Interpreter",interpreter)
     scores = scores.drop('Unnamed: 0',axis=1)
     scores["id"] = scores.index
-    scores_long = pd.wide_to_long(scores, ["0."], i="id", j="Noise percentage")
-    scores_long = scores_long.rename(columns={'0.': 'Pearson'})
+    # Function to rename columns
+    def rename_columns(column_name):
+        if "0." in column_name:
+            return '**'+str(int(float(column_name) * 100))
+        return column_name
+
+    # Apply the renaming function to the columns
+    scores.columns = [rename_columns(col) for col in scores.columns]
+    scores_long = pd.wide_to_long(scores, ["**"], i="id", j="Noise percentage")
+    scores_long = scores_long.rename(columns={'**': 'Pearson'})
     return scores_long
 
 # gv.mg_model_path = "/sise/home/lionb/mg_model_mito_10_06_22_5_0_new"

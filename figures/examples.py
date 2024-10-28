@@ -5,6 +5,7 @@ from scipy.stats import entropy
 from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
+from figure_config import figure_config
 
 
 params = [
@@ -115,10 +116,10 @@ def plot_organelle(examples_per_organelle, param, save_path):
         
         # Set y-axis labels for the first column
         if j == 0:
-            axes[0, j].set_ylabel('Input+Mask', fontsize=10, rotation=45, labelpad=30)
-            axes[1, j].set_ylabel('Prediction Noisy', fontsize=10, rotation=45, labelpad=30)
-            axes[2, j].set_ylabel('Prediction Original', fontsize=10, rotation=45, labelpad=30)
-            axes[3, j].set_ylabel('Ground Truth', fontsize=10, rotation=45, labelpad=30)
+            axes[0, j].set_ylabel('Input+Mask', rotation=45, labelpad=30,fontsize=figure_config["axis"], fontname=figure_config["font"])
+            axes[1, j].set_ylabel('Prediction Noisy', rotation=45, labelpad=30,fontsize=figure_config["axis"], fontname=figure_config["font"])
+            axes[2, j].set_ylabel('Prediction Original', rotation=45, labelpad=30,fontsize=figure_config["axis"], fontname=figure_config["font"])
+            axes[3, j].set_ylabel('Ground Truth', rotation=45, labelpad=30,fontsize=figure_config["axis"], fontname=figure_config["font"])
 
     # Adjust axis visibility
     for ax in axes.flat:
@@ -126,7 +127,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
         ax.yaxis.label.set_visible(True)
         ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)   
     
-    fig.suptitle(f"{param['organelle']}, TH={param['th']}", fontsize=16, y=0.92)
+    fig.suptitle(f"{param['organelle']}, TH={param['th']}",fontsize=figure_config["organelle"], fontname=figure_config["font"], y=0.92)
     plt.subplots_adjust(top=0.85)  # Adjust top spacing to accommodate subplot titles
     plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
@@ -149,7 +150,7 @@ def create_figure1(num_organelles, organelle_names, output_dir):
             else:
                 big_axes[i, j].axis('off')
 
-    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 1', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 1',fontsize=14, fontname=figure_config["font"], y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.savefig(os.path.join(output_dir, "multiple_organelles_part1.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
@@ -182,7 +183,7 @@ def create_figure2(num_organelles, organelle_names, output_dir):
     #         ax.imshow(img)
     #     big_axes[1, 1].axis('off')  # Hide the second cell in the third row
 
-    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 2', fontsize=16, y=0.9)  # Adjust the y parameter to control the padding
+    fig.suptitle('Mask Interpreter Multiple Examples per Organelle - Part 2', fontsize=14, fontname=figure_config["font"], y=0.9)  # Adjust the y parameter to control the padding
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.savefig(os.path.join(output_dir, "multiple_organelles_part2.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
@@ -195,7 +196,7 @@ organelle_names = []
 for param in params:
     print(param["organelle"])
     organelle_names.append(param["organelle"])
-    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
+    # plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}.png'.format(param["organelle"])))
 
 # Create the first figure with the first 6 organelles
 create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)

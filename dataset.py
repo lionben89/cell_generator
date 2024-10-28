@@ -95,7 +95,7 @@ class DataGen(keras.utils.Sequence):
                 if os.path.exists(self.new_path_origin):
                     shutil.rmtree(self.new_path_origin)
             except Exception as e:
-                print("SSD storage is not exist in self.new_path_origin")
+                print("SSD storage is not exist in {}".format(self.new_path_origin))
                 print(e)
                 self.new_path_origin = "/sise/assafzar-group/assafzar/temp/{}".format(os.environ.get('LOGNAME'))
                 if os.path.exists(self.new_path_origin):
@@ -166,7 +166,7 @@ class DataGen(keras.utils.Sequence):
             if (not os.path.exists(self.new_path_origin)):
                 os.makedirs(self.new_path_origin)
         except Exception as e:
-                print("SSD storage is not exist in self.new_path_origin")
+                print("SSD storage is not exist in {}".format(self.new_path_origin))
                 print(e)
                 self.new_path_origin = "/sise/assafzar-group/assafzar/temp/{}".format(os.environ.get('LOGNAME'))
                 if (not os.path.exists(self.new_path_origin)):

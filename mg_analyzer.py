@@ -27,6 +27,82 @@ z_step = 16
 
 batch_size = 4
 
+def calc_unet_pcc(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
+    """This method run analysis to calc unet model perfermence
+    Args:
+        dataset (_type_): _description_
+        model_path (_type_, optional): _description_. Defaults to gv.model_path.
+        model (_type_, optional): _description_. Defaults to None.
+        images (_type_, optional): _description_. Defaults to range(10).
+        weighted_pcc (bool, optional): _description_. Defaults to False.
+    """
+    batch_size=4
+    ##Load model
+    if model is None:
+        print("Loading model:",model_path)
+        model = keras.models.load_model(model_path)
+        
+    dir_path = "{}".format(model_path)
+    create_dir_if_not_exist(dir_path)
+    
+    pcc_results = DatasetMetadataSCV("{}/pcc_resuls.csv".format(dir_path))
+    pcc_results.create_header(["PCC"])
+
+    count=0
+    for image_index in images:
+        count+=1
+        print("image index: {}/{}".format(count,len(images)))
+        pccs = []
+        
+        slice_by = None
+        # slice_by = [None,(px_start,px_end),(py_start,py_end)]
+        print("preprocess..")
+        input_image,target_image,target_seg_image,nuc_image,mem_image,mem_seg_image = preprocess_image(dataset,int(image_index),[dataset.input_col,dataset.target_col,"structure_seg","channel_dna","channel_membrane","membrane_seg"],normalize=[True,True,False,True,True,False],slice_by=slice_by)
+        pz_end = input_image.shape[0]
+        if slice_by is None:
+            px_start=0
+            py_start=0
+            pz_start = 0
+            px_end=input_image.shape[1]
+            py_end=input_image.shape[2]
+        if target_seg_image is not None:
+            target_seg_image = target_seg_image/255.
+        else:
+            target_seg_image = np.zeros_like(target_image)
+            
+        if mem_seg_image is not None:
+            mem_seg_image = mem_seg_image/255.
+        else:
+            mem_seg_image = np.ones_like(target_image)
+        
+        ## Collect patchs
+        input_patchs = collect_patchs(px_start,py_start,pz_start,px_end,py_end,pz_end,input_image, gv.patch_size, xy_step, z_step)
+        if weighted_pcc:
+            target_seg_image_dilated = np.copy(target_seg_image)
+            for h in range(target_seg_image.shape[1]):
+                target_seg_image_dilated[0, h, :, :] = cv2.dilate(target_seg_image_dilated[0, h, :, :].astype(np.uint8), np.ones((25,25)))  
+        else:
+            target_seg_image_dilated = None
+        
+        weights = get_weights(input_patchs[0].shape)    
+        ## Batch predict
+        ## Predicte unet and mask
+        print("batch predict...")
+        unet_patchs_p = predict(model,input_patchs,batch_size,gv.patch_size)
+        
+        ## Back to image 
+        unet_p,d = assemble_image(px_start,py_start,pz_start,px_end,py_end,pz_end,[unet_patchs_p,np.ones_like(input_patchs)],weights,input_image.shape,gv.patch_size,xy_step,z_step)
+        
+        pcc_gt = pearson_corr((target_image), (unet_p/d),target_seg_image_dilated)
+        print("pearson with gt corr for image:{} is :{}".format(image_index,pcc_gt))
+        
+        del unet_patchs_p
+        
+        pcc_results.add_row(pcc_gt)
+        
+        del input_patchs
+        
+    pcc_results.create()
 
 def find_noise_scale(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
     """This method run analysis that find the std of the noise that need to be used for the input data

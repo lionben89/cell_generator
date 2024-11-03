@@ -5,7 +5,7 @@ from scipy.stats import entropy
 from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
-from figure_config import figure_config
+from figure_config import figure_config,scalebar
 
 
 params = [
@@ -108,7 +108,8 @@ def plot_organelle(examples_per_organelle, param, save_path):
         axes[0, j].imshow(overlay_image)
         title = axes[0, j].set_title(f'Slice {slice_index}', fontsize=figure_config["axis"], fontname=figure_config["font"], pad=10)  # Increase pad to adjust space below title
         title.set_position([0.5, 1.05])  # Adjust the title position
-
+        if j == 0:
+            axes[0, j].add_artist(scalebar)
         # Display prediction images and ground truth
         axes[1, j].imshow(prediction_noisy, cmap='gray')
         axes[2, j].imshow(prediction_original, cmap='gray')
@@ -199,7 +200,7 @@ image_index = 0
 for param in params:
     print(param["organelle"])
     organelle_names.append(param["organelle"])
-    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}_3d.png'.format(param["organelle"])))
+    # plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}_3d.png'.format(param["organelle"])))
 
 # Create the first figure with the first 6 organelles
 create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)

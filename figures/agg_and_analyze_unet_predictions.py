@@ -26,9 +26,9 @@ def plot_box_plots(data, columns, params):
         num_plots = len(params)
         num_cols = 2
         num_rows = math.ceil(num_plots / num_cols)  # Dynamically calculate rows based on 3 columns
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, num_cols * 2.5))  # Adjust figure size based on rows
-        fig.suptitle(f'UNET predictions vs GT by {x_col}', fontsize=figure_config["title"], fontname=figure_config["font"],y=0.92)
-        plt.subplots_adjust(hspace=0.1, wspace=0.05)
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(14, num_rows * 3))  # Adjust figure size based on rows
+        fig.suptitle(f'UNET predictions vs GT by {x_col}', fontsize=figure_config["title"], fontname=figure_config["font"])
+        plt.subplots_adjust(hspace=0.3, wspace=0.1,top=0.8)
         
         for idx, param in enumerate(params):
             row = idx // num_cols
@@ -90,8 +90,8 @@ def plot_box_plots(data, columns, params):
         for idx in range(num_plots, num_rows * num_cols):
             fig.delaxes(axes.flatten()[idx])
         
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison_unet.png',dpi=300, bbox_inches='tight')
+        # plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison_unet.png',bbox_inches='tight',pad_inches=0.05)
         plt.close()
 
 # Plot box plots for each specified column and result column

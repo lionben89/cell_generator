@@ -11,7 +11,7 @@ from mg_analyzer import analyze_th
 from figure_config import figure_config
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
+          {"organelle":"Nucleolus\n(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
           {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5},
           {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","noise":1.5},
           {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
@@ -31,7 +31,7 @@ weighted_pcc = False
 
 def plot_th_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.87
-    fig, axs = plt.subplots(4,3, figsize=(18, 18))  # 3x3 grid of subplots
+    fig, axs = plt.subplots(4,3, figsize=(12,12),gridspec_kw={'wspace':0.2,'hspace':0.4})  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -56,17 +56,21 @@ def plot_th_analysis():
                 last_over = over_threshold[-1]
                 ax.axvline(x=last_over, color='g', linestyle=':', label=f'Critical TH: {last_over}')
                 mean_mask_vol = mask_size[np.argmin(np.abs(ths - last_over))] * 100
-                ax.text(last_over + 0.02, 0.1, f'Mean Mask Vol: {mean_mask_vol:.2f}%', transform=ax.transData, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+                ax.text(last_over + 0.02, 0.9, f'Mean Mask Vol: {mean_mask_vol:.2f}%', transform=ax.transData, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
-            ax.legend(loc='upper right')
+            ax.legend(loc='lower left')
+            if i % 3 !=0:
+                ax.get_yaxis().set_visible(False)
+            if i < 7:
+                ax.get_xaxis().set_visible(False)
         except Exception as e:
             ax.axis('off')
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
-    plt.suptitle('Effect of TH the mask on Model Prediction from Noisy Input',fontsize=figure_config["title"], fontname=figure_config["font"])
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
-    plt.savefig("../figures/find_th.png")
+    plt.suptitle('Effect of TH the mask on \nModel Prediction from Noisy Input',fontsize=figure_config["title"], fontname=figure_config["font"])
+    # plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
+    plt.savefig("../figures/find_th.png",bbox_inches='tight', pad_inches=0.1)
 
 
 # for param in params:

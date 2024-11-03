@@ -25,7 +25,7 @@ gv.target = "channel_target"
 weighted_pcc = False
 
 def plot_unet_scores():
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,4),gridspec_kw={'wspace':0.2,'hspace':0.4})
 
     all_pcc_data = []
     labels = []
@@ -50,13 +50,13 @@ def plot_unet_scores():
     # Creating the boxplot
     bplot = ax.boxplot(all_pcc_data, patch_artist=True, labels=labels)
 
-    ax.set_title("Prediction performance across different subcellular structures (higher is better)",fontsize=figure_config["title"], fontname=figure_config["font"])
-    ax.set_xlabel("Organelles",fontsize=figure_config["axis"], fontname=figure_config["font"])
+    ax.set_title("Prediction performance across different\nsubcellular structures (higher is better)",fontsize=figure_config["title"], fontname=figure_config["font"])
+    # ax.set_xlabel("Organelles",fontsize=figure_config["axis"], fontname=figure_config["font"])
     ax.set_ylabel("PCC",fontsize=figure_config["axis"], fontname=figure_config["font"])
-    plt.xticks(rotation=60, ha='right')
+    plt.xticks(rotation=45, ha='right')
 
-    plt.tight_layout()
-    plt.savefig("../figures/unet_prediction_performance_sorted.png")
+    # plt.tight_layout()
+    plt.savefig("../figures/unet_prediction_performance_sorted.png",bbox_inches='tight', pad_inches=0.1)
     plt.show()
 
 # for param in params:

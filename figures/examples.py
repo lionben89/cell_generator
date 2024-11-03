@@ -5,8 +5,7 @@ from scipy.stats import entropy
 from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
-from figure_config import figure_config
-
+from figure_config import figure_config,scalebar
 
 params = [
           {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[30,36,27,36]},
@@ -106,6 +105,8 @@ def plot_organelle(examples_per_organelle, param, save_path):
         # Display the overlay image where input and mask are combined
         overlay_image = overlay_mask(input_image, mask_image)
         axes[0, j].imshow(overlay_image)
+        if j == 0:
+            axes[0, j].add_artist(scalebar)
         title = axes[0, j].set_title(f'Slice {slice_index}', fontsize=10, pad=10)  # Increase pad to adjust space below title
         title.set_position([0.5, 1.05])  # Adjust the title position
 
@@ -129,7 +130,7 @@ def plot_organelle(examples_per_organelle, param, save_path):
     
     fig.suptitle(f"{param['organelle']}, TH={param['th']}",fontsize=figure_config["organelle"], fontname=figure_config["font"], y=0.92)
     plt.subplots_adjust(top=0.85)  # Adjust top spacing to accommodate subplot titles
-    plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
 # Create the first figure with a 3x2 grid

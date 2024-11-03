@@ -14,9 +14,9 @@ for gpu in gpus:
 
 params = [
           {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_ngc_128"},
-          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_membrane_128"},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_mito_128"},
           {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0,"unet":"../unet_model_22_05_22_ne_128"},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_mito_128"},
+          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_membrane_128"},
           ]
 gv.patch_size = (32,128,128,1)
 
@@ -26,7 +26,7 @@ base_dir = "/sise/assafzar-group/assafzar/full_cells_fovs"
 X_gradcam = False
 layer_name = "unet_convt_bottleneck2"
 
-fig, axes = plt.subplots(2, 2, figsize=(16,6))  # Adjust the figure size as needed
+fig, axes = plt.subplots(2, 2, figsize=(12,6))  # Adjust the figure size as needed
 i = 0
 for param in params:
   gv.model_path = param["model"]
@@ -53,8 +53,8 @@ for param in params:
   
 # Display the plot
 # Adjust the layout to remove spaces between images
-fig.subplots_adjust(wspace=0, hspace=0)  # Remove horizontal and vertical space
+fig.subplots_adjust(wspace=0.0, hspace=0.15)  # Remove horizontal and vertical space
 
 # Display the plot
-fig.tight_layout(pad=0)  # Additional adjustment to tighten the layout
-fig.savefig("../figures/compare_method.png")
+# fig.tight_layout(pad=0)  # Additional adjustment to tighten the layout
+fig.savefig("../figures/compare_method.png",bbox_inches='tight',pad_inches=0.01)

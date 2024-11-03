@@ -5,13 +5,13 @@ from cell_imaging_utils.image.image_utils import ImageUtils
 import os
 import cv2
 import pandas as pd
-from figure_config import figure_config
+from figure_config import figure_config,scalebar,get_scalebar
 
 params = [
     {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise_vol":0.9,"slice":26},
-    {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise_vol":0.3,"slice":29},
-    {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise_vol":0.3,"slice":36},
-    {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise_vol":0.8,"slice":22},
+    # {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise_vol":0.3,"slice":29},
+    # {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise_vol":0.3,"slice":36},
+    # {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise_vol":0.8,"slice":22},
 ]
 
 def auto_balance(image):
@@ -78,7 +78,7 @@ def overlay_images(input_image, mask_image):
 # Create plot for a single organelle
 def plot_organelle(image_index, param, save_path):
     # Create a figure with a tight layout
-    fig = plt.figure(figsize=(12,9))
+    fig = plt.figure(figsize=(6,4.5))
     gs = gridspec.GridSpec(3,6,height_ratios=[1,1,1.5])
     gs.update(wspace=0.01, hspace=0.01)  # Minimal space between images
     
@@ -97,68 +97,70 @@ def plot_organelle(image_index, param, save_path):
     saliency_pcc = pd.read_csv("{}/saliency_evaluation_results_pearson.csv".format(param["model"]))["{0:.1f}".format(param["noise_vol"])].values[image_index]
     gradcam_pcc = pd.read_csv("{}/gradcam_evaluation_results_pearson.csv".format(param["model"]))["{0:.1f}".format(param["noise_vol"])].values[image_index]
     mask_size = param["noise_vol"]
-    fig.text(0.5,0.95, "Noise vol.={:.2f}%".format(mask_size*100), fontsize=figure_config["organelle"],fontname=figure_config["font"], color='black', ha='center', va='top')
+    fig.text(0.5,0.94, "Noise vol.={:.2f}%".format(mask_size*100), fontsize=figure_config["subtitle"],fontname=figure_config["font"], color='black', ha='center', va='top')
     
     # Adjust subplot parameters to bring title closer to images
-    plt.subplots_adjust(top=0.91)
+    plt.subplots_adjust(top=0.9)
 
     # Add the first image at the top left (33% width, 25% height)
     ax1 = plt.subplot(gs[0, :2])
     ax1.imshow(mask_interpreter_overlay)
     ax1.axis('off')  # Hide axes
     ax1.set_adjustable('box')
-    ax1.text(0.05, 0.95, "Mask Interpreter", transform=ax1.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
-
+    ax1.text(0.01, 0.95, "Mask Interpreter", transform=ax1.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax1.add_artist(scalebar)
+    
     # Add the second image at the top middle (33% width, 25% height)
     ax2 = plt.subplot(gs[0, 2:4])
     ax2.imshow(gradcam_overlay, cmap='gray')
     ax2.axis('off')
     ax2.set_adjustable('box')
-    ax2.text(0.05, 0.95, "GRADCAM", transform=ax2.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax2.text(0.01, 0.95, "GRADCAM", transform=ax2.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
 
     # Add the third image at the top right (33% width, 25% height)
     ax3 = plt.subplot(gs[0, 4:])
     ax3.imshow(saliency_overlay, cmap='gray')
     ax3.axis('off')
     ax3.set_adjustable('box')
-    ax3.text(0.05, 0.95, "Saliency", transform=ax3.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax3.text(0.01, 0.95, "Saliency", transform=ax3.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
 
     # Add the forth image at the middle left (33% width, 25% height)
     ax4 = plt.subplot(gs[1, :2])
     ax4.imshow(mask_interpreter_prediction_noisy, cmap='gray')
     ax4.axis('off')  # Hide axes
     ax4.set_adjustable('box')
-    ax4.text(0.05, 0.95, "PCC={0:.2f}".format(mask_interpreter_pcc), transform=ax4.transAxes,fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax4.text(0.01, 0.95, "PCC={0:.2f}".format(mask_interpreter_pcc), transform=ax4.transAxes,fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
 
     # Add the fifth image at the middle middle (33% width, 25% height)
     ax5 = plt.subplot(gs[1, 2:4])
     ax5.imshow(gradcam_prediction_noisy, cmap='gray')
     ax5.axis('off')  # Hide axes
     ax5.set_adjustable('box')
-    ax5.text(0.05, 0.95, "PCC={0:.2f}".format(gradcam_pcc), transform=ax5.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax5.text(0.01, 0.95, "PCC={0:.2f}".format(gradcam_pcc), transform=ax5.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
     
     # Add the sixth image at the middle right (33% width, 25% height)
     ax6 = plt.subplot(gs[1, 4:])
     ax6.imshow(saliency_prediction_noisy, cmap='gray')
     ax6.axis('off')  # Hide axes
     ax6.set_adjustable('box')
-    ax6.text(0.05, 0.95, "PCC={0:.2f}".format(saliency_pcc), transform=ax6.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax6.text(0.01, 0.95, "PCC={0:.2f}".format(saliency_pcc), transform=ax6.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
     
     # Add the seventh image at the bottom right (50% width, 50% height)
     ax7 = plt.subplot(gs[2, :3])
     ax7.imshow(prediction_original, cmap='gray')
     ax7.axis('off')
     ax7.set_adjustable('box')
-    ax7.text(0.05, 0.95, "Prediction", transform=ax7.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax7.text(0.01, 0.95, "Prediction", transform=ax7.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax7.add_artist(get_scalebar())
     
     # Add the eighth image at the bottom right (50% width, 50% height)
     ax8 = plt.subplot(gs[2, 3:])
     ax8.imshow(ground_truth, cmap='gray')
     ax8.axis('off')
     ax8.set_adjustable('box')
-    ax8.text(0.05, 0.95, "Ground truth", transform=ax8.transAxes, fontweight="bold",fontsize=14,fontname=figure_config["font"], color='white', ha='left', va='top')
+    ax8.text(0.01, 0.95, "Ground truth", transform=ax8.transAxes, fontweight="bold",fontsize=figure_config["text"],fontname=figure_config["font"], color='white', ha='left', va='top')
     
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_path,bbox_inches='tight',pad_inches=0.01)
     plt.close(fig)
 
 # Example usage

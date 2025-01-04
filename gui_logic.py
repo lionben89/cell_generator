@@ -391,17 +391,24 @@ def plot_evaluation_graph(fname,noise_levels, scores, interperters_names):
     plt.legend()
     plt.show()
     
-def plot_evaluation_graph_std(fname,interpreters_names,legend=True):
+def plot_evaluation_graph_std(fname,interpreters_names,legend=True,ylabel=True):
     data = pd.DataFrame({})
     for i in range(len(interpreters_names)):
         scores_long = load_scores(interpreters_names[i])
         data = pd.concat([data,scores_long],axis=0)
-    graph = sns.relplot(data=data, kind="line",x="Noise percentage", y="Pearson",hue="Interpreter",legend=legend, aspect=2)
-    # # Conditionally add the legend
-    # if not legend:
-    #     graph._legend.remove()  # Remove the legend if 'legend' is False
-    plt.xlabel("Noise percentage", fontsize=16,fontname=figure_config["font"])
-    plt.ylabel("PCC", fontsize=16,fontname=figure_config["font"])
+    # plt.rcParams['xtick.labelsize'] = 24     # X-axis tick label font size
+    # plt.rcParams['ytick.labelsize'] = 24     # Y-axis tick label font size
+    graph = sns.relplot(data=data, kind="line",x="Noise percentage", y="Pearson",hue="Interpreter",legend=legend, aspect=1.0, height=8)
+    for ax in graph.axes.flat:
+        ax.tick_params(axis='x', labelsize=24)
+        ax.tick_params(axis='y', labelsize=24)
+        if ylabel == False:
+            ax.set_xlabel('')                # Remove y-axis label text
+            ax.xaxis.set_visible(False)      # Hide the entire y-axis (ticks, labels)
+    plt.xlabel("Noise percentage", fontsize=24,fontname=figure_config["font"])
+    plt.ylabel("PCC", fontsize=24,fontname=figure_config["font"])
+    graph.fig.subplots_adjust(left=0.20, bottom=0.2) 
+
     graph.figure.savefig(fname)
    
 def evaluate_interperters(dir_path,dataset,unet_model,mg_model,selected_layer,X_gradcam, noise_scale):

@@ -29,7 +29,7 @@ weighted_pcc = False
 
 def plot_noise_scale_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.2
-    fig, axs = plt.subplots(4,3, figsize=(12,12),gridspec_kw={'wspace':0.2,'hspace':0.4})  # 3x3 grid of subplots
+    fig, axs = plt.subplots(2,5, figsize=(20,8),gridspec_kw={'wspace':0.2,'hspace':0.4})  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -56,16 +56,16 @@ def plot_noise_scale_analysis():
                 #             horizontalalignment='right', verticalalignment='top')
             
             ax.legend()
-            if i % 3 !=0:
+            if i % 5 != 0 :
                 ax.get_yaxis().set_visible(False)
-            if i < 7:
+            if i<5:
                 ax.get_xaxis().set_visible(False)
         except Exception as e:
             ax.axis('off')
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
-    plt.suptitle('Effect of Normal Noise Added to Input \non Model Prediction by Standard Deviation', fontsize=figure_config["title"], fontname=figure_config["font"])
+    plt.suptitle('Effect of Normal Noise Added to Input on Model Prediction by Standard Deviation', fontsize=figure_config["title"], fontname=figure_config["font"])
     # plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
     plt.savefig("../figures/find_noise_scale.png",bbox_inches='tight', pad_inches=0.1)
 

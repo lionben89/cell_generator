@@ -31,7 +31,7 @@ weighted_pcc = False
 
 def plot_th_analysis():
     # Enhanced setup for 9 subplots, each with additional annotations for the first x-value where PCC < 0.87
-    fig, axs = plt.subplots(4,3, figsize=(12,12),gridspec_kw={'wspace':0.2,'hspace':0.4})  # 3x3 grid of subplots
+    fig, axs = plt.subplots(2,5, figsize=(20,8),gridspec_kw={'wspace':0.2,'hspace':0.4})  # 3x3 grid of subplots
 
     for i, ax in enumerate(axs.flatten()):
         try:
@@ -68,7 +68,7 @@ def plot_th_analysis():
             print("data for subplot {} not exist".format(i))
 
     # Main title and layout adjustments
-    plt.suptitle('Effect of TH the mask on \nModel Prediction from Noisy Input',fontsize=figure_config["title"], fontname=figure_config["font"])
+    plt.suptitle('Effect of TH the mask on Model Prediction from Noisy Input',fontsize=figure_config["title"], fontname=figure_config["font"])
     # plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make room for the main title
     plt.savefig("../figures/find_th.png",bbox_inches='tight', pad_inches=0.1)
 

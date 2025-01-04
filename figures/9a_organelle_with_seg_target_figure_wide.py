@@ -157,4 +157,4 @@ organelle_names = []
 for param in params:
     print(param["organelle"])
     organelle_names.append(param["organelle"])
-    plot_organelle(image_index, param=param, save_path=os.path.join(output_dir, 'validation_{}.png'.format(param["organelle"])))
+    plot_organelle(image_index, param=param, save_path=os.path.join(output_dir, 'validation_{}_wide.png'.format(param["organelle"])))

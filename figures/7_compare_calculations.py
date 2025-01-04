@@ -3,7 +3,8 @@ from gui_logic import *
 from PIL import Image
 import matplotlib.pyplot as plt
 from figure_config import figure_config
-
+import os
+import tensorflow as tf
 
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
@@ -13,7 +14,7 @@ for gpu in gpus:
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_ngc_128"},
+          {"organelle":"Nucleolus\n(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_ngc_128"},
           {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0,"unet":"../unet_model_22_05_22_ne_128"},
           {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_mito_128"},
           {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise":1.5,"unet":"../unet_model_22_05_22_membrane_128"},
@@ -26,7 +27,8 @@ base_dir = "/sise/assafzar-group/assafzar/full_cells_fovs"
 X_gradcam = False
 layer_name = "unet_convt_bottleneck2"
 
-fig, axes = plt.subplots(2, 2, figsize=(12,6))  # Adjust the figure size as needed
+# Create a single row with 4 subplots
+fig, axes = plt.subplots(4, 1, figsize=(5, 10))  # Adjust the figure size as needed
 i = 0
 for param in params:
   gv.model_path = param["model"]
@@ -43,18 +45,22 @@ for param in params:
   png_filename = "{}/comparison.png".format(param["model"])
   legend = False
   # if i==3:
-  #       legend = True
-  plot_evaluation_graph_std(png_filename,["saliency","gradcam","mask_interperter"],legend)
+  #   legend = True
+  ylabel = False
+  if i==3:
+        ylabel = True
+  plot_evaluation_graph_std(png_filename, ["saliency","gradcam","mask_interperter"], legend,ylabel)
   im_graph = Image.open(png_filename)
-  axes[i//2,i%2].imshow(im_graph)
-  axes[i//2,i%2].axis('off')
-  axes[i//2,i%2].set_title(param['organelle'],fontsize=figure_config["organelle"],fontname=figure_config["font"])
-  i+=1
+  
+  axes[i].imshow(im_graph)
+  axes[i].axis('off')
+  axes[i].set_title(param['organelle'], fontsize=10, fontname=figure_config["font"])
+  i += 1
   
 # Display the plot
-# Adjust the layout to remove spaces between images
-fig.subplots_adjust(wspace=0.0, hspace=0.15)  # Remove horizontal and vertical space
+# Adjust the layout to change spaces between images
+fig.subplots_adjust(wspace=0.0, hspace=0.0)  # Change horizontal/vertical spacing
 
 # Display the plot
 # fig.tight_layout(pad=0)  # Additional adjustment to tighten the layout
-fig.savefig("../figures/compare_method.png",bbox_inches='tight',pad_inches=0.01)
+fig.savefig("../figures/compare_method.png", bbox_inches='tight', pad_inches=0.01)

@@ -8,7 +8,7 @@ import math
 from figure_config import figure_config
 
 # Define the path to your CSV files
-path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
+path = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -32,30 +32,30 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
-
+    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
+    # metadata_with_efficacy_scores_df = metadata_with_efficacy_scores_df[metadata_with_efficacy_scores_df['drug_label'].isin(['Vehicle','Staurosporine'])]
     # List of columns to plot unique values for
-    columns_to_plot = ['Workflow']
+    columns_to_plot = [['PlateId']]#[['drug_label','time_point (hr)']]
 
-    # Calculate the number of unique values for each column
-    unique_values_counts = {column: metadata_with_efficacy_scores_df[column].nunique() for column in columns_to_plot}
+    # # Calculate the number of unique values for each column
+    # unique_values_counts = {column: len(metadata_with_efficacy_scores_df[column].drop_duplicates()) for column in columns_to_plot}
 
-    # Plot unique values for each column
-    plt.figure(figsize=(12, 8))
-    plt.bar(unique_values_counts.keys(), unique_values_counts.values())
-    plt.xlabel('Column Name')
-    plt.ylabel('Number of Unique Values')
-    plt.title('Number of Unique Values for Each Column')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig('/sise/home/lionb/figures/unique_values_plot.png')
-    plt.show()
+    # # Plot unique values for each column
+    # plt.figure(figsize=(12, 8))
+    # plt.bar(unique_values_counts.keys(), unique_values_counts.values())
+    # plt.xlabel('Column Name')
+    # plt.ylabel('Number of Unique Values')
+    # plt.title('Number of Unique Values for Each Column')
+    # plt.xticks(rotation=45, ha='right')
+    # plt.tight_layout()
+    # plt.savefig('/sise/home/lionb/figures/unique_values_plot.png')
+    # plt.show()
 
-    # Print unique values for each column
-    for column in columns_to_plot:
-        unique_values = metadata_with_efficacy_scores_df[column].unique()
-        print(f"\nUnique values in {column}:")
-        print(unique_values)
+    # # Print unique values for each column
+    # for column in columns_to_plot:
+    #     unique_values = metadata_with_efficacy_scores_df[column].unique()
+    #     print(f"\nUnique values in {column}:")
+    #     print(unique_values)
 
 # List of columns with the results to plot
 params = [
@@ -80,7 +80,7 @@ def plot_box_plots(data, columns, params):
         num_plots = len(params)
         num_cols = 2
         num_rows = math.ceil(num_plots / num_cols)  # Dynamically calculate rows based on 3 columns
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(24,num_rows*6))  # Adjust figure size based on rows
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(64,num_rows*6))  # Adjust figure size based on rows
         fig.suptitle(f'Mask efficacy by {x_col}', fontsize=figure_config["title"], fontname=figure_config["font"])
         plt.subplots_adjust(hspace=0.3, wspace=0.1,top=0.8)
         for idx, param in enumerate(params):
@@ -98,13 +98,13 @@ def plot_box_plots(data, columns, params):
             control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
             
-            data_no_control = data[data['StructureShortName'] != control_structure]
-            unique_values = np.sort(data_no_control[x_col].unique())
-            groups = [data_no_control[data_no_control[x_col] == val][param["model"]].dropna() for val in unique_values]
+            data_no_control = data
+            unique_values = data_no_control[x_col].drop_duplicates().values
+            groups = [data_no_control[(data_no_control[x_col].values == list(val)) ][param["model"]].dropna() for val in unique_values]
             control_values = control_df[param["model"]].dropna()
             
             # Calculate fold change and p-values
-            fold_changes = [np.median(group) / np.median(control_values) for group in groups]
+            fold_changes = [np.mean(group) / np.mean(control_values) for group in groups]
             p_values = [mannwhitneyu(group, control_values, alternative='less').pvalue for group in groups]
             
             # Add control values to the groups
@@ -118,25 +118,25 @@ def plot_box_plots(data, columns, params):
             for patch, color in zip(box['boxes'], colors[:len(groups)]):
                 patch.set_facecolor(color)
             
-            ax.set_ylim(0.75, max(np.max(control_values), max([group.max() for group in groups])) + 0.01)
+            ax.set_ylim(0.5, max(np.max(control_values), max([group.max() for group in groups])) + 0.01)
             ax.set_title(f"{param['organelle']}",fontsize=figure_config["organelle"], fontname=figure_config["font"])
             # ax.set_xlabel(x_col,fontsize=figure_config["text"], fontname=figure_config["font"])
             if col == 0:
                 ax.set_ylabel('mask efficacy [PCC]',fontsize=figure_config["axis"], fontname=figure_config["font"])
-            else:
-                # Turn off y-axis
-                ax.get_yaxis().set_visible(False)
+            # else:
+            #     # Turn off y-axis
+            #     ax.get_yaxis().set_visible(False)
             
             ax.tick_params(axis='y', rotation=90)
             ax.tick_params(axis='x', rotation=0)
 
-            # # Annotate fold change and p-values
-            # for i, (fold_change, p_value) in enumerate(zip(fold_changes, p_values)):
-            #     text_y = max(np.max(control_values), max([group.max() for group in groups])) + 0.05
-            #     if p_value < 0.01 and np.median(groups[i]) < np.median(control_values):
-            #         ax.text(i + 1,text_y+0.05, '**', ha='center', va='top', color='blue', fontsize=14, fontname=figure_config["font"])
-            #     label = f"FC={fold_change:.2f}\np-value={p_value:.2g}"
-            #     ax.text(i + 1,text_y+0.02, label, ha='center', va='top', fontsize=figure_config["text"], fontname=figure_config["font"])
+            # Annotate fold change and p-values
+            for i, (fold_change, p_value) in enumerate(zip(fold_changes, p_values)):
+                text_y = max(np.max(control_values), max([group.max() for group in groups])) + 0.01
+                if p_value < 0.01 and np.median(groups[i]) < np.median(control_values):
+                    ax.text(i + 1,text_y+0.05, '**', ha='center', va='top', color='blue', fontsize=14, fontname=figure_config["font"])
+                label = f"FC={fold_change:.2f}\np-value={p_value:.2g}"
+                ax.text(i + 1,text_y+0.02, label, ha='center', va='top', fontsize=figure_config["text"], fontname=figure_config["font"])
         
         # Remove any empty subplots
         for idx in range(num_plots, num_rows * num_cols):

@@ -18,9 +18,9 @@ The data need to be dowloaded manually from https://www.allencell.org/data-downl
 #number of threads to run
 num_threads=1
 #where to save processed data
-storage_root = "/storage/users/assafzar/full_cells_fovs_perturbation"
+storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation"
 #temp location to save data that is being processed (SSD memory)
-temp_storage_root = "/storage/users/assafzar/full_cells_fovs_perturbation/raw"
+temp_storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/raw"
 #path to metadata.csv
 datasets_metadata_dir = "{}/drug_perturbation_dataset_2.csv".format(temp_storage_root)
 #what organelles to process
@@ -40,8 +40,8 @@ organelles={"Golgi":[],"Tight junctions":[],"Actomyosin bundles":[],"Microtubule
 ## fov to crop is 1:3 ratio 
 ## metadata.data.loc[metadata.data['structure_name'] == 'GJA1']
 ## not found 'ATP2A2','HIST1H2BJ','NUP153','SMC1A','SON'
-only_csvs = False
-override = False
+only_csvs = True
+override = True
 
 organelle_segmentor_dict = {'Actin filaments':SegActinFilaments(), 'Lysosome':SegLysosome(), 'Actomyosin bundles':SegMyosin(),
         'Endoplasmic reticulum':SegER(), 'Golgi':SegGolgi(), 'Tight junctions':SegTightJunctions(), 'Microtubules':SegMicrotubules()}

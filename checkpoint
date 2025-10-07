@@ -1,2 +1,2 @@
-model_checkpoint_path: "unet_model_29_03_23_actin_filaments_sarit"
-all_model_checkpoint_paths: "unet_model_29_03_23_actin_filaments_sarit"
+model_checkpoint_path: "cifar10_classifier2"
+all_model_checkpoint_paths: "cifar10_classifier2"

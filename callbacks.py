@@ -30,9 +30,11 @@ class SaveModelCallback(keras.callbacks.Callback):
             if save:
                 print("saving model {}...".format(self.path))
                 self.min_loss =  logs[self.monitor]
-                self.model.save(self.path,save_format="tf")
+                try:
+                    self.model.save(self.path,save_format="tf")
+                except Exception as e:
+                    self.model.save_weights(self.path)
                 print("model saved.")
-    
 
 # class ChangeWeightLossCallbackMaskInterpreter(keras.callbacks.Callback):
 #         def on_batch_end(self, epoch, logs=None):

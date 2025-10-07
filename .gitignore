@@ -26,6 +26,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*.png
+*.h5
+*.npy
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -161,3 +164,9 @@ analyzer_bundles_mg_loss_weight_0.9
 tight_junction_mg_train_loss_weight_0.9
 UNET_test_tight_junction
 UNET_train_tight_junction
+./checkpoint
+
+cifar10_classifier2.data-00000-of-00001
+cifar10_classifier2.index
+
+data/CIFAR-10-C.tar

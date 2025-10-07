@@ -71,9 +71,9 @@ def plot_box_plots(data, columns, params):
             ax.set_xlabel(x_col,fontsize=figure_config["text"], fontname=figure_config["font"])
             if col == 0:
                 ax.set_ylabel('UNET prediction vs GT [PCC]',fontsize=figure_config["axis"], fontname=figure_config["font"])
-            else:
-                # Turn off y-axis
-                ax.get_yaxis().set_visible(False)
+            # else:
+            #     # Turn off y-axis
+            #     ax.get_yaxis().set_visible(False)
             
             ax.tick_params(axis='y', rotation=90)
             ax.tick_params(axis='x', rotation=0)

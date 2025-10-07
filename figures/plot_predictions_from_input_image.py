@@ -24,7 +24,7 @@ params = [
     {"organelle": "DNA", "model": "../mg_model_dna_13_05_24_1.5b", "noise": 1.5, "th": 0.3},
 ]
 
-slice_num = 28 #for Endosomes_4 slice 23, for NE_0 slice 28
+slice_num = 42 #for Endosomes_4 slice 23, for NE_0 slice 28
 
 def auto_balance(image):
     image = image.astype(np.float32)
@@ -80,8 +80,8 @@ def generate_prediction_image(dataset, params, save_dir):
             threshold = param["th"]
             results_save_path = f"{save_dir}/{param['organelle']}"
             
-            # analyze_th(dataset, mode="regular", manual_th=threshold, save_image=True, save_histo=False, weighted_pcc=False, 
-                    #    model_path=model_path, images=range(1), noise_scale=noise_scale, save_results=True, results_save_path=results_save_path)
+            analyze_th(dataset, mode="regular", manual_th=threshold, save_image=True, save_histo=False, weighted_pcc=False, 
+                       model_path=model_path, images=range(1), noise_scale=noise_scale, save_results=True, results_save_path=results_save_path)
 
             # Display the input image in the first subplot (1st row, 1st column)
             input_image, nuc_image, mem_image, _, prediction_original, _, _ = collect_images(save_dir, param)  # Assuming first param's path for input image
@@ -126,7 +126,7 @@ def generate_prediction_image(dataset, params, save_dir):
     plt.savefig(final_fig_path,bbox_inches='tight',pad_inches=0.05)
     plt.show()
 
-save_dir = "/sise/home/lionb/figures/predictions/NE_0" #Endosomes_4
+save_dir = "/sise/home/lionb/figures/predictions/test" #Endosomes_4
 ds_path = f"{save_dir}/dataset.csv"
 dataset = DataGen(ds_path, "channel_signal", "channel_target", batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0.0, max_precentage=1.0, augment=False)
 generate_prediction_image(dataset, params, save_dir)

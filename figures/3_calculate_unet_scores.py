@@ -61,8 +61,7 @@ else:
     metadata_with_efficacy_scores_df.to_csv(ds_path)
     
 def predict_images_unet(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
-    """This method run analysis that find the std of the noise that need to be used for the input data
-        We test the prediction of noisy input by adding noise to the input with different stds, the noisy input is 0.5 signal, 0.5 noise.
+    """
     Args:
         dataset (_type_): _description_
         model_path (_type_, optional): _description_. Defaults to gv.model_path.

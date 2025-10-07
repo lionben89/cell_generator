@@ -27,6 +27,8 @@ requirements = [
     "seaborn",
     "patchify",
     "tensorflow-addons",
+    "joblib",
+    "umap-learn",
 ]
 
 

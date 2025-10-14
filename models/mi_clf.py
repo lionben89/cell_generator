@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 import tensorflow_addons as tfa  # if you use any tfa functions
-from metrics import tf_pearson_corr  # make sure this works on vector inputs
+from metrics import tf_pearson_corr
 from sklearn.model_selection import train_test_split
 from callbacks import *
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         adaptor=adaptor,
         classifier=classifier,
         weighted_pcc=False,  # or True if tf_pearson_corr supports weighting
-        pcc_target=0.9
+        pcc_target=0.95
     )
 
     # 1. Load and preprocess CIFAR-10 dataset

@@ -9,7 +9,7 @@ load = False
 
 # Define the classifier-on-masked-images model as a subclass of tf.keras.Model
 class clf(tf.keras.Model):
-    def __init__(self, input_size, mask_interpreter, **kwargs):
+    def __init__(self, input_size, mask_interpreter, base_model=None, **kwargs):
         """
         Args:
             input_size (tuple): Shape of the input image, e.g. (32, 32, 3)
@@ -19,7 +19,7 @@ class clf(tf.keras.Model):
         super(clf, self).__init__(**kwargs)
         self.mask_interpreter = mask_interpreter
         self.mask_interpreter.trainable = False
-        self.clf = self.build_simple_classifier(input_size)
+        self.clf = self.build_simple_classifier(input_size, base_model=base_model)
     
     def compute_masked_images(self, x):
         """
@@ -41,12 +41,12 @@ class clf(tf.keras.Model):
         importance_mask = tf.cast(self.mask_interpreter(x),dtype=tf.float32)  # shape (B, H, W, 1)
         # importance_mask = tf.random.uniform(tf.shape(x), dtype=tf.float32)
         # Create random noise.
-        normal_noise = tf.random.normal(tf.shape(importance_mask), stddev=self.mask_interpreter.noise_scale*2, dtype=tf.float32)
+        normal_noise = tf.random.normal(tf.shape(importance_mask), stddev=self.mask_interpreter.noise_scale*np.random.random(), dtype=tf.float32)
         # Compute adapted (noisy) image: use importance_mask to mix x and noise.
         adapted_image = (1-importance_mask) * x + (normal_noise * importance_mask)
         return adapted_image
 
-    def build_simple_classifier(self, input_shape):
+    def build_simple_classifier(self, input_shape, base_model=None):
         """
         Build a simple CNN classifier to be trained on masked images.
         """
@@ -61,12 +61,12 @@ class clf(tf.keras.Model):
         #     keras.layers.Dense(10, activation='softmax')
         # ])
         # return model
-    
-        base_model = tf.keras.applications.VGG19(
-        weights="imagenet",  # Load weights pre-trained on ImageNet
-        include_top=False,   # Exclude the fully connected layers
-        input_shape=(32, 32, 3)  # CIFAR-10 input size
-        )
+        if base_model is None:
+            base_model = tf.keras.applications.VGG19(
+            weights="imagenet",  # Load weights pre-trained on ImageNet
+            include_top=False,   # Exclude the fully connected layers
+            input_shape=(32, 32, 3)  # CIFAR-10 input size
+            )
 
         # Freeze base model layers
         # base_model.trainable = False  # Optional: Set to True for fine-tuning
@@ -133,8 +133,8 @@ if __name__ == "__main__":
     mask_interpreter.load_weights("cifar10_mi.h5")
     
     # Now, create an instance of our classifier on masked images.
-    model_clf = clf(input_size=(32,32,3), mask_interpreter=mask_interpreter)
-    model_clf.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-5),
+    model_clf = clf(input_size=(32,32,3), mask_interpreter=mask_interpreter, base_model=classifier)
+    model_clf.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-4),
                       loss='sparse_categorical_crossentropy',
                       metrics=['accuracy'])
     # model_clf.summary()
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     if not load:
         history = model_clf.fit(
             x_train_new, y_train_new,
-            epochs=20,
+            epochs=50,
             batch_size=128,
             validation_data=(x_val, y_val),
             callbacks = [early_stopping]
@@ -223,7 +223,7 @@ cifar10c_folder = download_and_extract_cifar10c(cifar10c_url, data_dir)
 # -----------------------------
 # Define the class 'clf' which trains a classifier on the masked (not important) parts.
 # -----------------------------
-class clf(tf.keras.Model):
+class clf_reg(tf.keras.Model):
     def __init__(self, input_size, mask_interpreter, **kwargs):
         """
         Args:

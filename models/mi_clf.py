@@ -241,7 +241,7 @@ if __name__ == "__main__":
     model_path = "cifar10_mi.h5"
 
     # mask_interpreter.build(x_train.shape)
-    checkpoint_callback = SaveModelCallback(1,mask_interpreter,model_path,monitor="val_stop",term="val_pcc",term_value=0.88)   
+    checkpoint_callback = SaveModelCallback(1,mask_interpreter,model_path,monitor="val_stop",term="val_pcc",term_value=0.92)   
 
     # 3. Set up EarlyStopping to halt training if validation loss stops improving
     early_stop_callback = tf.keras.callbacks.EarlyStopping(

@@ -4,8 +4,8 @@ from matplotlib_scalebar.scalebar import ScaleBar
 figure_config = {
     "title":20,
     "organelle":16,
-    "text":10,
-    "axis":10,
+    "text":12,
+    "axis":12,
     "subtitle":12,
     "font":"DejaVu Sans"
 }

@@ -123,7 +123,7 @@ class MaskInterpreter(keras.Model):
             else:
                 human_eval = (tf_pearson_corr(unet_target,unet_predictions))
             
-            pcc_loss =  tf.math.abs(self.pcc_target-human_eval)
+            pcc_loss =  tf.math.abs(self.pcc_target-tf.minimum(human_eval,self.pcc_target))
             
             total_loss = (similiarity_loss)*self.similiarity_loss_weight + (importance_mask_loss)*self.mask_loss_weight + (pcc_loss)*self.target_loss_weight
             

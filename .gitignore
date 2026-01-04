@@ -29,7 +29,14 @@ MANIFEST
 *.png
 *.h5
 *.npy
-
+*.tar
+*.npy
+*.pb
+/home/lionb/cell_generator/cellcycle_mi_marker1
+/home/lionb/cell_generator/cellcycle_mi_marker1/
+cellcycle_mi_marker1/
+.history
+.lh
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -170,3 +177,5 @@ cifar10_classifier2.data-00000-of-00001
 cifar10_classifier2.index
 
 data/CIFAR-10-C.tar
+
+

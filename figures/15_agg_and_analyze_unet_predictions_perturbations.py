@@ -8,7 +8,7 @@ import math
 from figure_config import figure_config
 
 # Define the path to your CSV files
-path = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"
+path = "/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"
 
 columns_to_plot = [['drug_label','time_point (hr)',]]
 # List of columns with the results to plot

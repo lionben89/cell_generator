@@ -315,7 +315,7 @@ def _vector_coerce_two_dense(x, y):
 
 # import pandas as pd
 
-# corr_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
+# corr_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
 # x_col = '../mg_model_membrane_13_05_24_1.5'
 # y_col = '../unet_model_22_05_22_membrane_128'
 
@@ -380,13 +380,13 @@ params = [
     # {"organelle":"Actomyosin bundles", "y_col":"../unet_model_22_05_22_bundles_128", "x_col":"../mg_model_bundles_13_05_24_1.0","drop":None},
     # {"organelle":"Endoplasmic reticulum", "y_col":"../unet_model_22_05_22_er_128", "x_col":"../mg_model_er_13_05_24_1.5","drop":[1]},
 ]
-corr_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
+corr_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
 drug_label = ['s-Nitro-Blebbistatin']#,'Staurosporine'] #,'Staurosporine'
 # corr_df = corr_df[ ~(corr_df['drug_label'].isin(drug_label))]
 
 for param in params:
     print(param["organelle"])
-    corr_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv".format(param["organelle"]))
+    corr_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv".format(param["organelle"]))
     
     x_col = param["x_col"]
     y_col = param["y_col"]

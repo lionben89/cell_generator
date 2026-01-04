@@ -10,18 +10,18 @@ import os
 from utils import get_weights
 
 #Methods to predict and compare to GT
-gv.model_type = "UNET"
+gv.model_type = "MG" #"UNET" #"VAE" #"AAE" #"AE" #"CLF" #"RC" #"PM" #"MG"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "../unet_model_22_05_22_microtubules_128"#../mg_model_unet_13_05_24_1.5"
+gv.model_path = "../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_2.0_mask_1.0_mse"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to predict the model upon
-gv.organelle = "Endosomes" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
@@ -31,8 +31,8 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    # gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+    # gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
@@ -246,7 +246,7 @@ elif (gv.model_type == "UNET"):
 
 elif (gv.model_type == "MG"):
     from mg_analyzer import analyze_th
-    analyze_th(test_dataset,"regular",mask_image=None,manual_th="full",save_image=1,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,images=[0,1])
+    analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,)
 
 elif (gv.model_type == "RC"):
     rc = keras.models.load_model(gv.model_path)

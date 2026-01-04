@@ -29,6 +29,8 @@ requirements = [
     "tensorflow-addons",
     "joblib",
     "umap-learn",
+    # "torch",
+    # "torchvision",
 ]
 
 

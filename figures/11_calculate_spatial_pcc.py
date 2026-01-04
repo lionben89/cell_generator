@@ -162,10 +162,10 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
 for param in params:
     try:
         print(param["model"])
-        base_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/spatial_pcc/{}".format(param["model"].split('/')[-1])
+        base_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/spatial_pcc/{}".format(param["model"].split('/')[-1])
         create_dir_if_not_exist(base_path)
         # ds_path = "{}/merged_dataset.csv".format(base_path)
-        ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/Endosomes/image_list_with_metadata__with_efficacy_scores_full.csv"
+        ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/Endosomes/image_list_with_metadata__with_efficacy_scores_full.csv"
         dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='combined_image_storage_path')
         print("# images in dataset:",dataset.df.data.shape[0])  
         predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[11,12],weighted_pcc=False,noise_scale=param["noise"])            

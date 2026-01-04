@@ -8,7 +8,7 @@ import math
 from figure_config import figure_config
 
 # Define the path to your CSV files
-path = "/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
+path = "/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -32,7 +32,7 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
+    metadata_with_efficacy_scores_df.to_csv("/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
     # metadata_with_efficacy_scores_df = metadata_with_efficacy_scores_df[metadata_with_efficacy_scores_df['drug_label'].isin(['Vehicle','Staurosporine'])]
     # List of columns to plot unique values for
     columns_to_plot = [['PlateId']]#[['drug_label','time_point (hr)']]
@@ -93,8 +93,8 @@ def plot_box_plots(data, columns, params):
             else:
                 control_organelle = param["organelle"]
                 
-            train_test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv")
-            test_df = pd.read_csv(f"/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
+            train_test_df = pd.read_csv(f"/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv")
+            test_df = pd.read_csv(f"/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
             control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
             

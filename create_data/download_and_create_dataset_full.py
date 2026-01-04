@@ -16,7 +16,7 @@ data_provider = quilt3.Bucket("s3://allencell")
 #Path to data location in bucket
 download_path = "aics/pipeline_integrated_cell/"
 #where to save downloaded data
-storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs/"
+storage_root = "/groups/assafza_group/assafza/full_cells_fovs/"
 #temp location to save data that is being processed (SSD memory)
 temp_storage_root = "/scratch/lionb@auth.ad.bgu.ac.il/{}/full_cells_fovs/".format(os.environ.get('SLURM_JOB_ID')) ##"/storage/users/assafzar/single_cells_fovs/"
 #path to metadata.csv

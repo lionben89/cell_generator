@@ -23,7 +23,7 @@ params = [
           # {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
           # {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
           ]
-base_dir = "/sise/assafzar-group/assafzar/full_cells_fovs"
+base_dir = "/groups/assafza_group/assafza/full_cells_fovs"
 gv.input = "channel_signal"
 gv.target = "channel_target"
 weighted_pcc = False

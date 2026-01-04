@@ -8,7 +8,7 @@ from mg_analyzer import analyze_th
 from utils import *
 
 # Define the path to your CSV files
-path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
+path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -32,7 +32,7 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv")
+    metadata_with_efficacy_scores_df.to_csv("/groups/assafza_group/assafza/full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv")
 
 # List of columns with the results to plot
 params = [
@@ -51,7 +51,7 @@ weighted_pcc = False
 def generate_low_efficacy_images(metadata_with_efficacy_scores_df, params):
     for param in tqdm(params):
         ## Collect training and testing data for the model
-        control_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_with_metadata__with_efficacy_scores_full.csv".format(param["organelle"]))
+        control_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_with_metadata__with_efficacy_scores_full.csv".format(param["organelle"]))
         control_values = control_df[param["model"]].dropna()
   
         # Calculate the lower and upper bounds for the control group without outliers
@@ -60,7 +60,7 @@ def generate_low_efficacy_images(metadata_with_efficacy_scores_df, params):
         iqr = q3 - q1
         lower_bound = q1 - 1.5 * iqr
         # upper_bound = q3 + 1.5 * iqr
-        results_save_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/outliers/{}".format(param["model"].split('/')[-1])
+        results_save_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/outliers/{}".format(param["model"].split('/')[-1])
         create_dir_if_not_exist(results_save_path)
         outliers_ds_path = "{}/outliers.csv".format(results_save_path)
         outliers_df = metadata_with_efficacy_scores_df[metadata_with_efficacy_scores_df[param["model"]] < lower_bound].sort_values(by=param["model"])

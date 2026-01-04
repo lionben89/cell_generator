@@ -16,16 +16,16 @@ gv.model_type = "MG"
 for_clf = (gv.model_type == "CLF")
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_ne_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_mito_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_ne_13_05_24_noise_1.5_sim_0.0_target_10.0_mask_1.0_real2" ## the model will be saved here
+gv.model_path = "../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_6.0_mask_0.0_mse" ## the model will be saved here
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Mitochondria" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 if gv.model_type == "CLF":
@@ -34,8 +34,8 @@ if gv.model_type == "CLF":
     gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
     gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
 else:
-    gv.train_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+    gv.train_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
+    gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
@@ -54,7 +54,7 @@ print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 print(gv.organelle)
 #example to add predictors to the dataset predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
 train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None,delete_cahce=True)
-validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None)
+validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None)
 
 if (gv.model_type == "VAE"):
     from models.VAE import *
@@ -154,9 +154,9 @@ elif (gv.model_type == "UNETP"):
 elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
-    similiarity_loss_weight = 0.0  # 1.0 default
-    target_loss_weight = 10.0 #10.0 is the default value 
-    mask_loss_weight=1.0 #1.0 is the default value 
+    similiarity_loss_weight = 1.0  # 1.0 default
+    target_loss_weight = 6.0 #10.0 is the default value 
+    mask_loss_weight=0.0 #1.0 is the default value 
     noise_scale = 1.5 #value according to find_noise_scale
     
     #The default target score calculation is regular PCC, if one wish to use weighted PCC uncomment the line below
@@ -187,7 +187,7 @@ elif (gv.model_type == "MG"):
     
     # checkpoint callback monitoring "val_stop" decides when to save the epoch, it is the linear composition of the distance from the target score and the size of the mask self.pcc_target-pcc_loss + mean_mask
     # term and term value make surm that the value of term in the loss is greater then the term value before saving the epoch
-    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.88)
+    checkpoint_callback = SaveModelCallback(min(1,gv.number_epochs),model,gv.model_path,monitor="val_stop",term="val_pcc",term_value=0.03)
     print("similiarity_loss_weight: ", similiarity_loss_weight)
     print("mask_loss_weight: ",mask_loss_weight)
     print("noise_scale: ",noise_scale)

@@ -23,7 +23,7 @@ class SaveModelCallback(keras.callbacks.Callback):
         print("current {} is :{}, min {} is:{}".format(self.monitor,logs[self.monitor],self.monitor,self.min_loss))
         if (self.epoch % self.freq == 0 and logs[self.monitor]<self.min_loss):
             if ((self.term is not None and self.term_value is not None) or self.save_all):
-                if (logs[self.term]> self.term_value) or self.save_all:
+                if (logs[self.term] > self.term_value) or self.save_all:
                     save = True
             else:
                 save = True

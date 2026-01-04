@@ -23,7 +23,7 @@ reducer = lambda histograms, n_components: perform_umap(histograms, n_components
 n_components = 4
 n_clusters = 4
 
-base_dir = "/sise/assafzar-group/assafzar/full_cells_fovs{}".format(mode)
+base_dir = "/groups/assafza_group/assafza/full_cells_fovs{}".format(mode)
 gv.input = "channel_signal"
 gv.target = "channel_target"
 weighted_pcc = False
@@ -105,10 +105,10 @@ def perform_umap(histograms, n_components=2):
 
 for param in params:
     gv.target = param["target_col"]
-    ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs{}/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv".format(mode)
-    new_ds_path = "/sise/assafzar-group/assafzar/full_cells_fovs{}/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv".format(mode,param["organelle"])
+    ds_path = "/groups/assafza_group/assafza/full_cells_fovs{}/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv".format(mode)
+    new_ds_path = "/groups/assafza_group/assafza/full_cells_fovs{}/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv".format(mode,param["organelle"])
     print("dataset:",param["organelle"])
-    save_path = "/sise/assafzar-group/assafzar/full_cells_fovs{}/train_test_list/unet_predictions/histos_{}.npy".format(mode,param["organelle"])
+    save_path = "/groups/assafza_group/assafza/full_cells_fovs{}/train_test_list/unet_predictions/histos_{}.npy".format(mode,param["organelle"])
     if not load:
         with tempfile.NamedTemporaryFile(mode='w', newline='') as temp_file:
             temp_file_path = temp_file.name  # Get the path to the temporary file

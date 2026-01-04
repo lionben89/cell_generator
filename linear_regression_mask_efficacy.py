@@ -107,7 +107,7 @@ def evaluate_models(X, y, title):
 # y = corr_df[y_col].values.reshape([-1,1])
 
 # Perturbations data
-corr_df = pd.read_csv("/sise/assafzar-group/assafzar/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
+corr_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
 drug_label = 'All'
 
 x_col = '../mg_model_dna_13_05_24_1.5b'

@@ -75,6 +75,7 @@ class MaskInterpreter(keras.Model):
         self.mask_loss_weight = mask_loss_weight
         self.noise_scale = noise_scale
         self.target_loss_weight = target_loss_weight
+        print(f"compile: g_optimizer:{g_optimizer}, similiarity_loss_weight:{similiarity_loss_weight}, mask_loss_weight:{mask_loss_weight}, noise_scale:{noise_scale}, target_loss_weight:{target_loss_weight}")
     
     @property
     def metrics(self):
@@ -104,6 +105,7 @@ class MaskInterpreter(keras.Model):
 
             similiarity_loss = tf.reduce_mean(
                tf.reduce_mean(
+                #    keras.losses.mean_absolute_error(unet_target, unet_predictions),axis=(1,2)
                    keras.losses.mean_squared_error(unet_target, unet_predictions),axis=(1,2)
                ),axis=(0,1)
             )            
@@ -112,8 +114,8 @@ class MaskInterpreter(keras.Model):
 
             importance_mask_loss = tf.reduce_mean(
                tf.reduce_mean(
-                #   keras.losses.mean_squared_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
-                  keras.losses.mean_absolute_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
+                  keras.losses.mean_squared_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
+                #   keras.losses.mean_absolute_error(tf.zeros_like(importance_mask), importance_mask),axis=(1,2)
                ),axis=(0,1)
             )
             
@@ -131,12 +133,12 @@ class MaskInterpreter(keras.Model):
             grads = tape.gradient(total_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights)) 
         
-        self.importance_mask_size.update_state((1-mean_importance_mask))
+        self.importance_mask_size.update_state(mean_importance_mask)
         self.similiarity_loss_tracker.update_state(similiarity_loss)  
         self.binary_size_mask.update_state(tf.zeros_like(importance_mask), importance_mask)
         self.pcc.update_state(human_eval)
         self.total_loss_tracker.update_state(total_loss)
-        self.stop.update_state(pcc_loss + mean_importance_mask)
+        self.stop.update_state(pcc_loss + importance_mask_loss)
                
         return {
             "similiarity_loss": self.similiarity_loss_tracker.result(),

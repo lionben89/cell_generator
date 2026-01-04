@@ -8,12 +8,12 @@ from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import Da
 #and True if you wnt the same files for all organlles
 GLOBAL_LIST = False
 #The path to where the metadata of the downloaded images
-storage_root = "/sise/assafzar-group/assafzar/full_cells_fovs/" #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
+storage_root = "/groups/assafza_group/assafza/full_cells_fovs/" #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
 #path to save to lists in the end
 if GLOBAL_LIST:
   lists_root_dir = "/home/lionb/cell_generator"
 else:
-  lists_root_dir = "/sise/assafzar-group/assafzar/full_cells_fovs/train_test_list/"
+  lists_root_dir = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/"
 #what organelles to process
 organelles={"Peroxisomes":[]} # organelles={"Tight junctions":[],"Golgi":[],"Actomyosin bundles":[],"Microtubules":[],"Actin filaments":[],"Endoplasmic reticulum":[],"Lysosome":[]} ## pertrub
 #% of images to be in the trainin set, the rest will be in the test set

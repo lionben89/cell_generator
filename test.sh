@@ -28,5 +28,5 @@ echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
 module load anaconda              ### load anaconda module
 source activate cell_generator_new        ### activating environment, environment must be configured before running the job
 export PYTHONUNBUFFERED=TRUE 
-cd /sise/home/lionb/cell_generator
-python /sise/home/lionb/cell_generator/test.py
+cd /home/lionb/cell_generator
+python /home/lionb/cell_generator/test.py

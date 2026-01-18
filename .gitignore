@@ -179,4 +179,6 @@ cifar10_classifier2.index
 data/CIFAR-10-C.tar
 cellcycle_mi_marker1
 cellcycle_mi_marker2
-
+cellcycle_mi_images_marker1_test
+cellcycle_mi_images_marker2_test
+cifar10_images

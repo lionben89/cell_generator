@@ -31,6 +31,7 @@ requirements = [
     "umap-learn",
     # "torch",
     # "torchvision",
+    "brokenaxes",
 ]
 
 

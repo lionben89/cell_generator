@@ -8,11 +8,12 @@ import cv2
 from figure_config import figure_config, get_scalebar
 
 params = [
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_0.0_target_2.0_mask_1.0_mse","th":0.2,"slices":[44]},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_0.0_mask_4.0_mse","th":0.2,"slices":[44]},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_6.0_mask_4.0_mse","th":0.2,"slices":[44]},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_2.0_mask_1.0_mse","th":0.2,"slices":[44]},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_0.0_target_2.0_mask_1.0_mse","th":0.2,"slices":[44], "title":"S=0 T=6 M=1"},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_2.0_mask_1.0_mse","th":0.2,"slices":[44], "title":"S=1 T=6 M=1"},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_0.0_mask_4.0_mse","th":0.2,"slices":[44], "title":"S=1 T=0 M=4"},
+          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_6.0_mask_4.0_mse","th":0.2,"slices":[44], "title":"S=1 T=6 M=4"},
           ]
+
 def auto_balance(image):
     """Auto balance the image similar to ImageJ's Auto Contrast function."""
     # Convert to float32 to avoid issues with overflow/underflow
@@ -102,11 +103,14 @@ def plot_params_comparison(params, image_index, save_path):
     num_params = len(params)
     # Make figure square: 4 params wide, each top cell is unit 1, bottom cells are 4 units tall
     # Total height: 2 (top rows) + 4 (bottom row) = 6 units, width: 4 units, so 4x1.5=6 for square
-    fig = plt.figure(figsize=(num_params * 2.0, num_params * 3.0))
+    fig = plt.figure(figsize=(num_params * 2.0, num_params * 1.61))
+    
+    # Add figure title using organelle from first param
+    fig.suptitle(params[0]["organelle"], fontsize=18, fontname=figure_config["font"], weight='bold')
     
     # Create GridSpec with height ratios: top 2 rows get 1 unit each, bottom row gets 4 units
-    gs = GridSpec(3, max(num_params, 2), figure=fig, hspace=0.0, wspace=0.0,
-                  height_ratios=[1, 1, 4])
+    gs = GridSpec(3, max(num_params, 2), figure=fig, hspace=0.02, wspace=0.02,
+                  height_ratios=[1, 1, 2])
     
     # Top section: input+mask and prediction noisy for each param
     for i, param in enumerate(params):
@@ -118,24 +122,24 @@ def plot_params_comparison(params, image_index, save_path):
         ax0.imshow(overlay_image)
         if i == 0:
             ax0.add_artist(get_scalebar())
-            ax0.set_ylabel('Input+Mask', rotation=45, labelpad=30, 
-                          fontsize=figure_config["axis"], fontname=figure_config["font"])
+            ax0.text(0.02, 0.98, 'Bright-field+Mask', transform=ax0.transAxes,
+                    fontsize=8, fontname=figure_config["font"],
+                    color='white', weight='bold', va='top', ha='left')
         # Set column title as model name
-        title = ax0.set_title(param["model"].split("/")[-1], fontsize=8, pad=10)
+        title = ax0.set_title(param["title"].split("/")[-1], fontsize=12, pad=4)
         title.set_position([0.5, 1.05])
         ax0.get_xaxis().set_visible(False)
-        ax0.yaxis.label.set_visible(True)
-        ax0.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+        ax0.get_yaxis().set_visible(False)
         
         # Row 1: Prediction noisy
         ax1 = fig.add_subplot(gs[1, i])
         ax1.imshow(prediction_noisy, cmap='gray')
         if i == 0:
-            ax1.set_ylabel('Prediction Noisy', rotation=45, labelpad=30, 
-                          fontsize=figure_config["axis"], fontname=figure_config["font"])
+            ax1.text(0.02, 0.98, 'Noisy prediction', transform=ax1.transAxes,
+                    fontsize=8, fontname=figure_config["font"],
+                    color='white', weight='bold', va='top', ha='left')
         ax1.get_xaxis().set_visible(False)
-        ax1.yaxis.label.set_visible(True)
-        ax1.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+        ax1.get_yaxis().set_visible(False)
     
     # Bottom section: prediction original and ground truth from first param only
     input_image, mask_image, prediction_original, prediction_noisy, ground_truth, slice_index = collect_images(params[0], image_index)
@@ -144,8 +148,8 @@ def plot_params_comparison(params, image_index, save_path):
     ax2 = fig.add_subplot(gs[2, :num_params//2])
     ax2.imshow(prediction_original, cmap='gray')
     ax2.add_artist(get_scalebar())
-    ax2.text(0.02, 0.98, 'Prediction Original', transform=ax2.transAxes,
-            fontsize=figure_config["axis"], fontname=figure_config["font"],
+    ax2.text(0.02, 0.98, 'Prediction', transform=ax2.transAxes,
+            fontsize=8, fontname=figure_config["font"],
             color='white', weight='bold', va='top', ha='left')
     ax2.get_xaxis().set_visible(False)
     ax2.get_yaxis().set_visible(False)
@@ -155,14 +159,14 @@ def plot_params_comparison(params, image_index, save_path):
     ax3 = fig.add_subplot(gs[2, num_params//2:])
     ax3.imshow(ground_truth, cmap='gray')
     ax3.text(0.02, 0.98, 'Ground Truth', transform=ax3.transAxes,
-            fontsize=figure_config["axis"], fontname=figure_config["font"],
+            fontsize=8, fontname=figure_config["font"],
             color='white', weight='bold', va='top', ha='left')
     ax3.get_xaxis().set_visible(False)
     ax3.get_yaxis().set_visible(False)
     ax3.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
     
-    plt.savefig(save_path, bbox_inches='tight', pad_inches=0.0)
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0.0, wspace=0.01)
+    plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0.02, wspace=0.02)
     plt.close(fig)
 
 # Directory to save individual plots

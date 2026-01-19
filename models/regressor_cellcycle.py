@@ -1,3 +1,127 @@
+"""
+Cell Cycle Regression Model
+===========================
+
+This script trains ResNet18-based regression models to predict cell cycle markers
+(Cdt1 and Geminin) from brightfield microscopy images of cells.
+
+Overview:
+---------
+The script performs the following steps:
+    1. Load cell cycle dataset (train/val/test/perturbations splits)
+    2. Normalize images using per-dataset statistics
+    3. Build and train two separate ResNet18-based regression models:
+       - Marker 1 model: Predicts Cdt1 intensity (cell cycle G1/S marker)
+       - Marker 2 model: Predicts Geminin intensity (cell cycle S/G2/M marker)
+    4. Evaluate models on test and perturbation datasets
+    5. Generate visualization plots (scatter, residual, distribution plots)
+
+Data Format:
+------------
+    Images (.npy files):
+        - Shape: (T, C, Y, X)
+        - T = number of timepoints (typically 1)
+        - C = number of channels/cell indices per image
+        - Y, X = spatial dimensions (e.g., 64x64 pixels)
+    
+    Labels (.npy files):
+        - Shape: (C, T, N)
+        - C = number of marker channels (2: Cdt1, Geminin)
+        - T = number of timepoints
+        - N = number of cell indices (matches image C dimension)
+
+Data Loading Modes:
+-------------------
+    The load_cell_cycle_data() function supports two modes:
+    
+    1. Load ALL indices (default):
+       >>> x_train, y_train = load_cell_cycle_data(data_dir)
+       This loads every cell index from each image file, useful for
+       maximum data utilization.
+    
+    2. Load specific index:
+       >>> x_train, y_train = load_cell_cycle_data(data_dir, index=0)
+       This loads only index 0 from each image file, useful for
+       consistent sampling or debugging.
+
+Model Architecture:
+-------------------
+    ResNet18-based architecture with custom modifications:
+    
+    1. Custom Stem (for grayscale input):
+       - Conv2D(64, 7x7, stride=2) -> BatchNorm -> ReLU -> MaxPool
+    
+    2. ResNet18 Backbone:
+       - Block 1: 2x BasicBlock(64 filters)
+       - Block 2: 2x BasicBlock(128 filters, first with stride=2)
+       - Block 3: 2x BasicBlock(256 filters, first with stride=2)
+       - Block 4: 2x BasicBlock(512 filters, first with stride=2)
+       - Global Average Pooling -> 512-dim feature vector
+    
+    3. MLP Head:
+       - Dense(512) embedding layer
+       - 4x [Dense(512) -> LayerNorm -> GELU] blocks
+       - Dense(1, sigmoid) output layer
+    
+    Output: Single value in [0, 1] representing marker intensity
+
+Adaptive Batch Normalization:
+-----------------------------
+    When adabatch=True (default), batch normalization statistics are
+    adapted to each evaluation dataset before predictions. This helps
+    account for domain shift between training and test/perturbation data.
+    
+    The adapt_batch_norm() function runs forward passes with training=True
+    to update running mean/variance statistics in BN layers.
+
+Training Configuration:
+-----------------------
+    - Optimizer: Adam (learning_rate=1e-4)
+    - Loss: Mean Squared Error (MSE)
+    - Metrics: Mean Absolute Error (MAE)
+    - Batch size: 32
+    - Max epochs: 100
+    - Early stopping: patience=10, restore_best_weights=True
+
+Output Files:
+-------------
+    Models:
+        - cellcycle_marker1.h5: Trained Cdt1 prediction model
+        - cellcycle_marker2.h5: Trained Geminin prediction model
+    
+    Visualizations:
+        - cellcycle_markers_results.png: Scatter and residual plots (test set)
+        - cellcycle_cdt1_distribution.png: Cdt1 prediction distribution
+        - cellcycle_geminin_distribution.png: Geminin prediction distribution
+        - cellcycle_joint_distribution.png: Joint Cdt1-Geminin density (predicted)
+        - cellcycle_joint_distribution_true.png: Joint density (ground truth)
+        - cellcycle_markers_perturbations_results.png: Perturbation results
+        - cellcycle_test_vs_perturbations_comparison.png: MAE comparison bar chart
+
+Configuration Flags:
+--------------------
+    load (bool): If True, load pre-trained models instead of training.
+                 Default: False (train new models)
+    
+    adabatch (bool): If True, apply adaptive batch normalization before
+                     evaluation on each dataset. Default: True
+
+Usage Example:
+--------------
+    # Train new models
+    $ python cellcycle-clf.py
+    
+    # To load existing models instead of training, set load=True in the script
+
+Dependencies:
+-------------
+    - tensorflow / keras
+    - numpy
+    - matplotlib
+    - multiprocessing
+    - tqdm
+"""
+
 import os
 import glob
 import numpy as np
@@ -15,28 +139,62 @@ adabatch = True  # Enable adaptive batch normalization for test/perturbation set
 # 1. Load Cell Cycle Dataset
 print("Loading Cell Cycle data...")
 
-def load_single_sample(img_file, labels_dir):
-    """Load a single image-label pair. Used for parallel processing."""
+def load_single_sample(img_file, labels_dir, index=None):
+    """Load image-label pairs from a file. Used for parallel processing.
+    
+    Args:
+        img_file: Path to the image file
+        labels_dir: Directory containing label files
+        index: If None, load all indices. If int, load only that index.
+    
+    Returns:
+        If index is None: tuple of (list of images, list of labels)
+        If index is int: tuple of (single image, single label)
+    """
     try:
         filename = os.path.basename(img_file)
         label_file = os.path.join(labels_dir, filename)
         
         if not os.path.exists(label_file):
             return None, None
-            
-        # Load image: T, C, Y, X - take first timepoint and channel
-        bf = np.load(img_file)[0, 0]  # Shape: (64, 64)
         
-        # Load labels: C, T, 1 - take first timepoint for both channels
-        target = np.load(label_file)[:, 0, 0]  # Shape: (2,) - [marker1, marker2]
+        # Load full arrays
+        img_data = np.load(img_file)  # Shape: (T, C, Y, X)
+        label_data = np.load(label_file)  # Shape: (C, T, N)
         
-        return bf, target
+        if index is None:
+            # Load all indices
+            num_indices = img_data.shape[1]  # C dimension
+            images = []
+            labels = []
+            for idx in range(num_indices):
+                # Image: T, C, Y, X - take first timepoint and current index
+                bf = img_data[0, idx]  # Shape: (Y, X)
+                # Labels: C, T, N - take all channels, first timepoint, current index
+                target = label_data[:, 0, idx]  # Shape: (2,)
+                images.append(bf)
+                labels.append(target)
+            return images, labels
+        else:
+            # Load single index (original behavior)
+            bf = img_data[0, index]  # Shape: (64, 64)
+            target = label_data[:, 0, index]  # Shape: (2,) - [marker1, marker2]
+            return bf, target
     except Exception as e:
         print(f"Error loading {img_file}: {e}")
         return None, None
 
-def load_cell_cycle_data(data_dir, num_workers=None):
-    """Load all cell cycle data from the given directory using parallel processing."""
+def load_cell_cycle_data(data_dir, num_workers=None, index=None):
+    """Load all cell cycle data from the given directory using parallel processing.
+    
+    Args:
+        data_dir: Directory containing images/ and labels/ subdirectories
+        num_workers: Number of parallel workers (default: cpu_count - 1)
+        index: If None, load all indices from each image. If int, load only that index.
+    
+    Returns:
+        Tuple of (images, labels) as numpy arrays
+    """
     images_dir = os.path.join(data_dir, "images")
     labels_dir = os.path.join(data_dir, "labels")
     
@@ -51,7 +209,7 @@ def load_cell_cycle_data(data_dir, num_workers=None):
     print(f"  Loading with {num_workers} workers...")
     
     # Parallel loading with progress bar
-    load_func = partial(load_single_sample, labels_dir=labels_dir)
+    load_func = partial(load_single_sample, labels_dir=labels_dir, index=index)
     
     with Pool(processes=num_workers) as pool:
         results = list(tqdm(
@@ -67,8 +225,14 @@ def load_cell_cycle_data(data_dir, num_workers=None):
     
     for bf, target in results:
         if bf is not None and target is not None:
-            all_images.append(bf)
-            all_labels.append(target)
+            if index is None:
+                # bf and target are lists when loading all indices
+                all_images.extend(bf)
+                all_labels.extend(target)
+            else:
+                # bf and target are single arrays when loading specific index
+                all_images.append(bf)
+                all_labels.append(target)
     
     # Convert to numpy arrays
     images = np.array(all_images)

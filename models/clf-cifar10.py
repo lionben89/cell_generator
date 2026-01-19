@@ -52,7 +52,7 @@ print("\nBuilding model...")
 #     tf.keras.layers.Dense(10, activation='softmax')
 # ])
 
-# Load pre-trained ResNet-50 model
+# Load pre-trained VGG19 model
 base_model = tf.keras.applications.VGG19(
     weights="imagenet",  # Load weights pre-trained on ImageNet
     include_top=False,   # Exclude the fully connected layers

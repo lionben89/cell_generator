@@ -25,14 +25,8 @@ gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Mi
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-if gv.model_type == "CLF":
-    gv.input = "channel_target"
-    gv.target = "channel_target"
-    gv.train_ds_path = "/home/lionb/cell_generator/image_list_train.csv"
-    gv.test_ds_path = "/home/lionb/cell_generator/image_list_test.csv"
-else:
-    # gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-    gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
@@ -56,104 +50,7 @@ print("Vehicle: ", drug)
 #Create a test dataset with 1 sample just to take the list of the images
 test_dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0, max_precentage=1, augment=False, norm_type=norm_type,predictors=predictors)
 
-if (gv.model_type == "VAE"):
-    from models.VAE import *
-    vae = keras.models.load_model(gv.model_path)
-
-    if (not os.path.exists("{}/predictions".format(gv.model_path))):
-        os.makedirs("{}/predictions".format(gv.model_path))
-    n = test_dataset.__len__()
-    ppc = 0
-    out = 0
-    for j in range(n):
-        patchs = test_dataset.__getitem__(j)[0]
-        target_patchs = test_dataset.__getitem__(j)[1]
-        prediction = vae(patchs).numpy()
-        for i in range(patchs.shape[0]):
-            k = j*patchs.shape[0] + i
-            if k < 10:
-                ImageUtils.imsave(
-                    patchs[i], "{}/predictions/input_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    target_patchs[i], "{}/predictions/target_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    prediction[i], "{}/predictions/prediction_patch_{}.tiff".format(gv.model_path, k))
-            p = pearson_corr(target_patchs[i], prediction[i])
-
-            ppc += p
-            print("pearson correlation for image {}: {}".format(k, p))
-    print("avg pearson correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
-
-elif (gv.model_type == "AAE"):
-    from models.AAE import *
-    aae = keras.models.load_model(gv.model_path)
-
-    if (not os.path.exists("{}/predictions".format(gv.model_path))):
-        os.makedirs("{}/predictions".format(gv.model_path))
-    n = test_dataset.__len__()
-    ppc = 0
-    out = 0
-    for j in range(n):
-        patchs = test_dataset.__getitem__(j)[0]
-        target_patchs = test_dataset.__getitem__(j)[1]
-        z = aae.encoder(patchs).numpy()
-        prediction = aae.decoder(z).numpy()
-        z[:, 56] = -2
-        alteredm2 = aae.decoder(z).numpy()
-        z[:, 56] = 2
-        alteredp2 = aae.decoder(z).numpy()
-        for i in range(patchs.shape[0]):
-            k = j*patchs.shape[0] + i
-            if k < 10:
-                ImageUtils.imsave(
-                    alteredm2[i]*255, "{}/predictions/altered_minus2_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    alteredp2[i]*255, "{}/predictions/altered_plus2_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    target_patchs[i]*255, "{}/predictions/target_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    prediction[i]*255, "{}/predictions/prediction_patch_{}.tiff".format(gv.model_path, k))
-            p = PSNR(target_patchs[i]*255, prediction[i]*255)
-
-            ppc += p
-            print("psnr correlation for image {}: {}".format(k, p))
-    print("avg psnr correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
-
-elif (gv.model_type == "AE"):
-    from models.AE import *
-    ae = keras.models.load_model(gv.model_path)
-
-    if (not os.path.exists("{}/predictions".format(gv.model_path))):
-        os.makedirs("{}/predictions".format(gv.model_path))
-    n = test_dataset.__len__()
-    ppc = 0
-    out = 0
-    for j in range(n):
-        patchs = test_dataset.__getitem__(j)[0]
-        target_patchs = test_dataset.__getitem__(j)[1]
-        prediction = ae(patchs).numpy()
-        for i in range(patchs.shape[0]):
-            k = j*patchs.shape[0] + i
-            if k < 10:
-                ImageUtils.imsave(
-                    patchs[i], "{}/predictions/input_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    target_patchs[i], "{}/predictions/target_patch_{}.tiff".format(gv.model_path, k))
-                ImageUtils.imsave(
-                    prediction[i], "{}/predictions/prediction_patch_{}.tiff".format(gv.model_path, k))
-            p = pearson_corr(target_patchs[i], prediction[i])
-
-            ppc += p
-            print("pearson correlation for image {}: {}".format(k, p))
-    print("avg pearson correlation: {}".format(ppc/((patchs.shape[0]*n)-out)))
-
-elif (gv.model_type == "CLF"):
-    clf = keras.models.load_model(gv.model_path)
-    dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 4, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False, for_clf=for_clf)
-    for i in range(20):
-        clf.evaluate(dataset)
-        
-elif (gv.model_type == "UNET"):
+if (gv.model_type == "UNET"):
     # images = [1]
     images = range(min(3,test_dataset.df.get_shape()[0]))
     unet = keras.models.load_model(gv.model_path)
@@ -162,8 +59,8 @@ elif (gv.model_type == "UNET"):
     pcc = 0
     for image_index in images:        
         # image_index = 1
-        if (not os.path.exists("{}/predictions_pipe44/{}".format(gv.model_path,image_index))):
-            os.makedirs("{}/predictions_pipe44/{}".format(gv.model_path,image_index))
+        if (not os.path.exists("{}/predictions_test/{}".format(gv.model_path,image_index))):
+            os.makedirs("{}/predictions_test/{}".format(gv.model_path,image_index))
         image_path = test_dataset.df.get_item(image_index,'path_tiff')
         input_image, input_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.input_col)
         target_image, target_new_file_path = test_dataset.get_image_from_ssd(image_path,test_dataset.target_col)
@@ -247,61 +144,3 @@ elif (gv.model_type == "UNET"):
 elif (gv.model_type == "MG"):
     from mg_analyzer import analyze_th
     analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,)
-
-elif (gv.model_type == "RC"):
-    rc = keras.models.load_model(gv.model_path)
-    if (not os.path.exists("{}/predictions".format(gv.rc_model_path))):
-        os.makedirs("{}/predictions".format(gv.rc_model_path))
-    n = test_dataset.__len__()
-    ppc = 0
-    pred_ppc = 0
-    for j in range(n):
-        patchs = test_dataset.__getitem__(j)[0]
-        target_patchs = test_dataset.__getitem__(j)[1]
-        x = rc(patchs)
-        prediction_score = x[0].numpy()
-        features = x[1].numpy()
-        prediction = rc.unet(patchs).numpy()
-
-        for i in range(patchs.shape[0]):
-            k = j*patchs.shape[0] + i
-            if k < 10:
-                ImageUtils.imsave(
-                    patchs[i], "{}/predictions/input_patch_{}.tiff".format(gv.rc_model_path, k))
-                ImageUtils.imsave(
-                    target_patchs[i], "{}/predictions/target_patch_{}.tiff".format(gv.rc_model_path, k))
-                ImageUtils.imsave(
-                    prediction[i], "{}/predictions/prediction_{}.tiff".format(gv.rc_model_path, k))
-            p = pearson_corr(target_patchs[i], prediction[i])
-            pred_ppc += prediction_score[i][0]
-            ppc += p
-
-            print("pearson correlation for image {}: {}, predicted:{}".format(
-                k, p, prediction_score[i][0]))
-    print("avg pearson correlation: {}, predicted:{}".format(
-        ppc/(n*patchs.shape[0]), pred_ppc/(n*patchs.shape[0])))
-
-elif (gv.model_type == "PM"):
-    pm = keras.models.load_model(gv.model_path)
-    if (not os.path.exists("{}/predictions".format(gv.pm_model_path))):
-        os.makedirs("{}/predictions".format(gv.pm_model_path))
-    unet = keras.models.load_model(gv.interpert_model_path)
-    len = test_dataset.__len__()
-    total_ba = []
-    for j in range(len):
-        patchs = test_dataset.__getitem__(j)[0]
-        labels = test_dataset.__getitem__(j)[1]
-        predictions = pm([patchs[0],patchs[1]]).numpy()
-        total_ba.append(tf.reduce_mean(keras.metrics.binary_accuracy(labels,predictions)))
-        for i in range(patchs[0].shape[0]):
-            k = j*patchs[0].shape[0] + i
-            if k < 32:
-                ImageUtils.imsave(
-                    patchs[0][i], "{}/predictions/input_patch_{}.tiff".format(gv.pm_model_path, k))
-                ImageUtils.imsave(
-                    patchs[1][i], "{}/predictions/target_patch_{}.tiff".format(gv.pm_model_path, k))
-            print("score for pair {}: prediction:{}, label:{}".format(
-                k, predictions[i], labels[i]))
-    print("total accuracy is :",np.average(total_ba))
-    
-

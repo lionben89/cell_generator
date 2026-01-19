@@ -1,3 +1,141 @@
+"""
+MaskInterpreter Evaluation Script for Cell Cycle Marker Regression
+===================================================================
+
+This script evaluates trained MaskInterpreter models on cell cycle data and
+generates visualizations and predictions showing which image regions are
+important for predicting cell cycle markers (Cdt1 and Geminin).
+
+Overview:
+---------
+The script loads pre-trained MaskInterpreter models and applies them to
+cell cycle microscopy images to:
+1. Generate importance masks that highlight regions critical for prediction
+2. Create visualizations comparing original vs. adapted (masked) images
+3. Save mask predictions as .npy files for downstream analysis
+
+This is the evaluation/inference companion to MaskInterpreterRegression.py
+which handles training.
+
+Workflow:
+---------
+    1. Load cell cycle dataset (train/val/test/perturbations)
+    2. Normalize images using dataset-specific statistics
+    3. Load pretrained regression models (Marker 1 and Marker 2)
+    4. Load trained MaskInterpreter models for both markers
+    5. Generate importance masks for all images
+    6. Optionally create per-sample visualizations
+    7. Optionally save all mask predictions as .npy files
+
+Visualization Output:
+---------------------
+    For each sample, generates a 4-panel figure showing:
+    
+    Panel 1: Original Image
+        - Grayscale brightfield image
+        - True marker value and predicted marker value
+    
+    Panel 2: Adapted (Noisy) Image
+        - Image with non-important regions replaced by noise
+        - Shows prediction on the adapted image
+    
+    Panel 3: Importance Mask
+        - Heatmap of importance values [0,1]
+        - High values (red) = important for prediction
+        - Low values (blue) = not important
+    
+    Panel 4: Mask Overlay
+        - Original image with mask overlaid (alpha=0.5)
+        - Shows mask efficacy (correlation between original/adapted predictions)
+
+Mask Efficacy:
+--------------
+    Measured as the Pearson correlation between:
+    - Regressor prediction on original image
+    - Regressor prediction on adapted image (important regions preserved)
+    
+    High efficacy (~1.0) = mask correctly identifies important regions
+    Low efficacy = mask fails to capture what the regressor uses
+
+Data Format:
+------------
+    Input Images (.npy):
+        - Shape: (T, C, Y, X) - loaded as (64, 64, 1) grayscale
+    
+    Input Labels (.npy):
+        - Shape: (C, T, N) - two markers: Cdt1 (0), Geminin (1)
+    
+    Output Masks (.npy):
+        - Shape: (64, 64) or (64, 64, 1)
+        - Values in [0, 1] representing importance
+
+Output Files:
+-------------
+    Visualizations (if plot_examples=True):
+        - ./cellcycle_mi_images_marker1_{dataset}/*.png
+        - ./cellcycle_mi_images_marker2_{dataset}/*.png
+    
+    Predictions (if create_all_predictions=True):
+        - {base_dir}/{dataset}/predictions_marker1/*.npy
+        - {base_dir}/{dataset}/predictions_marker2/*.npy
+        - Filenames match original image filenames
+
+Required Input Models:
+----------------------
+    Regressors:
+        - cellcycle_marker1.h5: Trained Cdt1 regressor
+        - cellcycle_marker2.h5: Trained Geminin regressor
+    
+    MaskInterpreters:
+        - ./cellcycle_mi_marker1/: Trained mask interpreter for Marker 1
+        - ./cellcycle_mi_marker2/: Trained mask interpreter for Marker 2
+
+Configuration Settings:
+-----------------------
+    num_samples (int): Number of samples to visualize.
+                       Default: 100
+    
+    dataset_to_visualize (str): Which dataset split to process.
+                                Options: "train", "val", "test", "perturbations"
+                                Default: "perturbations"
+    
+    plot_examples (bool): Whether to generate visualization plots.
+                          Default: False
+    
+    create_all_predictions (bool): Whether to save all mask predictions as .npy.
+                                   Default: True
+
+Key Functions:
+--------------
+    load_single_sample(img_file, labels_dir):
+        Load a single image-label pair for parallel processing.
+    
+    load_cell_cycle_data(data_dir, num_workers=None):
+        Load all data from directory using multiprocessing.
+
+Dependencies:
+-------------
+    - tensorflow / keras
+    - numpy
+    - matplotlib
+    - tqdm
+    - multiprocessing
+    - Custom modules: metrics (tf_pearson_corr), models.MaskInterpreterRegression, models.UNETO
+
+Usage:
+------
+    # Edit settings at top of script, then run:
+    $ python mi_reg_cellcycle_eval.py
+    
+    # To only generate predictions (no plots):
+    #   plot_examples = False
+    #   create_all_predictions = True
+    
+    # To only visualize samples (no bulk predictions):
+    #   plot_examples = True
+    #   create_all_predictions = False
+"""
+
 import os
 import glob
 import numpy as np
@@ -5,8 +143,6 @@ import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
-from functools import partial
 from metrics import tf_pearson_corr
 
 ###############--SETTINGS--##########################
@@ -16,75 +152,7 @@ plot_examples = False  # Whether to generate visualization plots
 create_all_predictions = True  # Whether to save all mask predictions as .npy files
 
 ###############--DATA LOADING--##########################
-
-def load_single_sample(img_file, labels_dir):
-    """Load a single image-label pair. Used for parallel processing."""
-    try:
-        filename = os.path.basename(img_file)
-        label_file = os.path.join(labels_dir, filename)
-        
-        if not os.path.exists(label_file):
-            return None, None
-            
-        # Load image: T, C, Y, X - take first timepoint and channel
-        bf = np.load(img_file)[0, 0]  # Shape: (64, 64)
-        
-        # Load labels: C, T, 1 - take first timepoint for both channels
-        target = np.load(label_file)[:, 0, 0]  # Shape: (2,) - [marker1, marker2]
-        
-        return bf, target
-    except Exception as e:
-        print(f"Error loading {img_file}: {e}")
-        return None, None
-
-def load_cell_cycle_data(data_dir, num_workers=None):
-    """Load all cell cycle data from the given directory using parallel processing."""
-    images_dir = os.path.join(data_dir, "images")
-    labels_dir = os.path.join(data_dir, "labels")
-    
-    image_files = sorted(glob.glob(os.path.join(images_dir, "*.npy")))
-    
-    print(f"  Found {len(image_files)} files in {data_dir}")
-    
-    # Determine number of workers
-    if num_workers is None:
-        num_workers = max(1, cpu_count() - 1)
-    
-    print(f"  Loading with {num_workers} workers...")
-    
-    # Parallel loading with progress bar
-    load_func = partial(load_single_sample, labels_dir=labels_dir)
-    
-    with Pool(processes=num_workers) as pool:
-        results = list(tqdm(
-            pool.imap(load_func, image_files),
-            total=len(image_files),
-            desc="  Loading files",
-            unit="file"
-        ))
-    
-    # Filter out failed loads and separate images and labels
-    all_images = []
-    all_labels = []
-    
-    for bf, target in results:
-        if bf is not None and target is not None:
-            all_images.append(bf)
-            all_labels.append(target)
-    
-    # Convert to numpy arrays
-    images = np.array(all_images)
-    labels = np.array(all_labels)
-    
-    # Add channel dimension for grayscale images
-    images = np.expand_dims(images, axis=-1)  # Shape: (N, Y, X, 1)
-    
-    print(f"  Loaded {len(images)} samples")
-    print(f"  Image shape: {images.shape}")
-    print(f"  Labels shape: {labels.shape}")
-    
-    return images, labels
-
+from models.regressor_cellcycle import load_cell_cycle_data
 
 if __name__ == "__main__":
     # Load dataset
@@ -115,7 +183,7 @@ if __name__ == "__main__":
     marker2_model = tf.keras.models.load_model('cellcycle_marker2.h5')
     
     # Load mask interpreters
-    from mi_reg_cellcycle import MaskInterpreterRegression
+    from models.MaskInterpreterRegression import MaskInterpreterRegression
     from models.UNETO import get_unet
     
     # Create adaptors

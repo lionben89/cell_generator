@@ -1,3 +1,149 @@
+"""
+MaskInterpreter for Cell Cycle Marker Regression
+=================================================
+
+This script implements a MaskInterpreter model adapted for regression tasks,
+specifically designed to generate interpretable importance masks that explain
+cell cycle marker predictions from brightfield microscopy images.
+
+Overview:
+---------
+The MaskInterpreterRegression learns to generate importance masks that identify
+which regions of a cell image are critical for predicting cell cycle markers
+(Cdt1 and Geminin intensities). By perturbing non-important regions with noise
+while preserving important regions, the regressor's output should remain similar.
+
+This is an adaptation of the classification-based MaskInterpreter for regression
+tasks on biological microscopy data.
+
+Architecture:
+-------------
+    1. Input Augmentation:
+       - Original grayscale image (64x64x1)
+       - Gradient magnitude channel: computes the gradient of the regressor's
+         output w.r.t. the input, normalized to [0,1]
+       - Augmented input shape: (64x64x2)
+    
+    2. Generator Network:
+       - Adaptor network (U-Net) that takes augmented input
+       - Outputs importance mask (64x64x1)
+       - Mask values in [0,1] where 1 = important, 0 = not important
+    
+    3. Regressor:
+       - Pretrained cell cycle marker regression model (frozen weights)
+       - Separate models for Marker 1 (Cdt1) and Marker 2 (Geminin)
+       - Outputs single value in [0,1] representing marker intensity
+
+Training Objective:
+-------------------
+    The model is trained to minimize a composite loss:
+    
+    1. Similarity Loss (MSE):
+       - MSE between regressor outputs on original vs. adapted images
+       - Encourages the mask to preserve regressor-relevant information
+    
+    2. Mask Sparsity Loss (L1):
+       - Mean absolute value of the mask
+       - Encourages smaller masks (only highlight truly important regions)
+    
+    3. PCC Target Loss:
+       - |pcc_target - actual_pcc|
+       - Encourages predictions to maintain a target Pearson correlation
+       - pcc_target=0.95 means we want 95% correlation between outputs
+    
+    Total Loss = (similarity_loss * sim_weight) + 
+                 (mask_loss * mask_weight) + 
+                 (pcc_loss * target_weight)
+
+Mask Efficacy:
+--------------
+    Mask efficacy is measured as the Pearson Correlation Coefficient (PCC)
+    between the regressor's predictions on:
+    - The original image
+    - The adapted image (important regions preserved, others replaced with noise)
+    
+    Higher PCC = mask successfully identifies important regions for regression
+    Lower PCC = mask fails to capture what the regressor uses
+
+Data Format:
+------------
+    Images (.npy files):
+        - Shape: (T, C, Y, X) - T=timepoints, C=channels, Y/X=spatial
+        - Loaded as (64, 64, 1) grayscale images
+    
+    Labels (.npy files):
+        - Shape: (C, T, N) - C=markers (2), T=timepoints, N=indices
+        - Two markers: Cdt1 (index 0) and Geminin (index 1)
+
+Workflow:
+---------
+    1. Load cell cycle dataset (train/val/test splits)
+    2. Normalize images using per-dataset statistics
+    3. Load pretrained regression models for Marker 1 and Marker 2
+    4. Create two MaskInterpreterRegression instances (one per marker)
+    5. Train both mask interpreters on training data
+    6. Generate importance masks that explain each regressor's predictions
+
+Output Files:
+-------------
+    Models:
+        - cellcycle_mi_marker1/: Trained MaskInterpreter weights for Marker 1
+        - cellcycle_mi_marker2/: Trained MaskInterpreter weights for Marker 2
+    
+    Required Input Models:
+        - cellcycle_marker1.h5: Pretrained Cdt1 regressor
+        - cellcycle_marker2.h5: Pretrained Geminin regressor
+
+Configuration Flags:
+--------------------
+    load (bool): If True, load pre-trained MaskInterpreter weights.
+                 Default: False
+    
+    train (bool): If True, train the MaskInterpreter models.
+                  Default: True
+    
+    adabatch (bool): If True, apply adaptive batch normalization.
+                     Default: False
+    
+    num_samples (int): Number of samples to visualize.
+                       Default: 100
+    
+    num_samples_subset (int): Number of samples for computing metrics.
+                              Default: 500
+
+Key Classes and Functions:
+--------------------------
+    MaskInterpreterRegression (keras.Model):
+        - __init__: Initialize with adaptor network and regressor
+        - compile: Set optimizer and loss weights
+        - train_step: Custom training loop with gradient augmentation
+        - call: Generate importance mask for input images
+        - predict_from_noisy: Get regressor prediction on adapted image
+        - _augment_input_with_gradients: Add gradient magnitude as extra channel
+    
+    Data Loading Functions:
+        - load_single_sample: Load single image-label pair for parallel processing
+        - load_cell_cycle_data: Load all data from directory with multiprocessing
+
+Training Configuration:
+-----------------------
+    - Optimizer: Adam (learning_rate=5e-4)
+    - Loss Weights: similarity=1.0, mask=1.0, target=1.75
+    - Noise Scale: 0.5
+    - PCC Target: 0.95
+    - Batch Size: 128
+    - Max Epochs: 200
+    - Early Stopping: patience=7, restore_best_weights=True
+
+Dependencies:
+-------------
+    - tensorflow / keras
+    - numpy
+    - tqdm
+    - multiprocessing
+    - Custom modules: metrics (tf_pearson_corr), callbacks, models.UNETO
+"""
+
 import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
@@ -5,12 +151,12 @@ from metrics import tf_pearson_corr
 from callbacks import *
 import os
 import glob
-from multiprocessing import Pool, cpu_count
-from functools import partial
-from tqdm import tqdm
+import importlib
 
 # Ensure eager execution (TF2 does this by default)
 tf.compat.v1.enable_eager_execution()
+
+from models.regressor_cellcycle import load_cell_cycle_data
 
 ###############--LOAD--##########################
 load = False
@@ -203,74 +349,7 @@ class MaskInterpreterRegression(keras.Model):
 
 
 ###############--DATA LOADING--##########################
-
-def load_single_sample(img_file, labels_dir):
-    """Load a single image-label pair. Used for parallel processing."""
-    try:
-        filename = os.path.basename(img_file)
-        label_file = os.path.join(labels_dir, filename)
-        
-        if not os.path.exists(label_file):
-            return None, None
-            
-        # Load image: T, C, Y, X - take first timepoint and channel
-        bf = np.load(img_file)[0, 0]  # Shape: (64, 64)
-        
-        # Load labels: C, T, 1 - take first timepoint for both channels
-        target = np.load(label_file)[:, 0, 0]  # Shape: (2,) - [marker1, marker2]
-        
-        return bf, target
-    except Exception as e:
-        print(f"Error loading {img_file}: {e}")
-        return None, None
-
-def load_cell_cycle_data(data_dir, num_workers=None):
-    """Load all cell cycle data from the given directory using parallel processing."""
-    images_dir = os.path.join(data_dir, "images")
-    labels_dir = os.path.join(data_dir, "labels")
-    
-    image_files = sorted(glob.glob(os.path.join(images_dir, "*.npy")))
-    
-    print(f"  Found {len(image_files)} files in {data_dir}")
-    
-    # Determine number of workers
-    if num_workers is None:
-        num_workers = max(1, cpu_count() - 1)
-    
-    print(f"  Loading with {num_workers} workers...")
-    
-    # Parallel loading with progress bar
-    load_func = partial(load_single_sample, labels_dir=labels_dir)
-    
-    with Pool(processes=num_workers) as pool:
-        results = list(tqdm(
-            pool.imap(load_func, image_files),
-            total=len(image_files),
-            desc="  Loading files",
-            unit="file"
-        ))
-    
-    # Filter out failed loads and separate images and labels
-    all_images = []
-    all_labels = []
-    
-    for bf, target in results:
-        if bf is not None and target is not None:
-            all_images.append(bf)
-            all_labels.append(target)
-    
-    # Convert to numpy arrays
-    images = np.array(all_images)
-    labels = np.array(all_labels)
-    
-    # Add channel dimension for grayscale images
-    images = np.expand_dims(images, axis=-1)  # Shape: (N, Y, X, 1)
-    
-    print(f"  Loaded {len(images)} samples")
-    print(f"  Image shape: {images.shape}")
-    print(f"  Labels shape: {labels.shape}")
-    
-    return images, labels
+# load_cell_cycle_data is imported from cellcycle-clf.py at the top of this file
 
 
 if __name__ == "__main__":

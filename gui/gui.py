@@ -1,5 +1,5 @@
 import PySimpleGUI as sg
-from gui_logic import *
+from gui.gui_logic import *
 import io
 from PIL import Image
 import numpy as np

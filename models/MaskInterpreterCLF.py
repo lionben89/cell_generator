@@ -1,3 +1,138 @@
+"""
+MaskInterpreter for CIFAR-10 Classification
+============================================
+
+This script implements a MaskInterpreter model for generating interpretable
+importance masks that explain image classifier predictions. It is designed
+for the CIFAR-10 dataset and evaluates robustness on CIFAR-10-C corruptions.
+
+Overview:
+---------
+The MaskInterpreter learns to generate importance masks that identify which
+regions of an input image are critical for the classifier's prediction.
+The key insight is that if we perturb non-important regions with noise while
+preserving important regions, the classifier's output should remain similar.
+
+Architecture:
+-------------
+    1. Input Augmentation:
+       - Original image (32x32x3)
+       - Gradient magnitude channel: computes the gradient of the classifier's
+         max predicted probability w.r.t. the input, normalized to [0,1]
+       - Augmented input shape: (32x32x4)
+    
+    2. Generator Network:
+       - Conv2D preprocessing layer (32 filters, 3x3)
+       - Adaptor network (U-Net) that outputs importance mask (32x32x1)
+       - Mask values in [0,1] where 1 = important, 0 = not important
+    
+    3. Classifier:
+       - Pretrained CIFAR-10 classifier (frozen weights)
+       - Used to compute similarity between original and adapted predictions
+
+Training Objective:
+-------------------
+    The model is trained to minimize a composite loss:
+    
+    1. Similarity Loss (MSE):
+       - MSE between classifier outputs on original vs. adapted images
+       - Encourages the mask to preserve classifier-relevant information
+    
+    2. Mask Sparsity Loss (L1):
+       - Mean absolute value of the mask
+       - Encourages smaller masks (only highlight truly important regions)
+    
+    3. PCC Target Loss:
+       - |pcc_target - actual_pcc|
+       - Encourages predictions to maintain a target Pearson correlation
+       - pcc_target=0.95 means we want 95% correlation between outputs
+    
+    Total Loss = (similarity_loss * sim_weight) + 
+                 (mask_loss * mask_weight) + 
+                 (pcc_loss * target_weight)
+
+Mask Efficacy:
+--------------
+    Mask efficacy is measured as the Pearson Correlation Coefficient (PCC)
+    between the classifier's predictions on:
+    - The original image
+    - The adapted image (important regions preserved, others replaced with noise)
+    
+    Higher PCC = mask successfully identifies important regions
+    Lower PCC = mask fails to capture what the classifier uses
+
+Workflow:
+---------
+    1. Load pretrained CIFAR-10 classifier
+    2. Create MaskInterpreter with U-Net adaptor
+    3. Train on CIFAR-10 training data
+    4. Evaluate on test set and generate visualizations
+    5. Evaluate on CIFAR-10-C corruptions to test robustness
+    6. Analyze correlation between mask efficacy and classifier accuracy
+    7. Find optimal threshold to predict classifier correctness
+
+CIFAR-10-C Evaluation:
+----------------------
+    The script evaluates the trained MaskInterpreter on CIFAR-10-C, which
+    contains 15 types of corruptions (noise, blur, weather, digital) at
+    5 severity levels. This tests whether the learned importance masks
+    generalize to corrupted/out-of-distribution images.
+
+Output Files:
+-------------
+    Model:
+        - cifar10_mi.h5: Trained MaskInterpreter weights
+    
+    Visualizations:
+        - cifar10_images/*.png: Per-sample visualizations (original, adapted, mask)
+        - mask_efficacy_boxplot.png: Boxplot of mask efficacy across datasets
+        - accuracy_boxplot.png: Boxplot of classifier accuracy across datasets
+        - correlation_mask_efficacy_vs_accuracy.png: Scatter plots per group
+        - mask_efficacy_median_barplot.png: Bar plot of median efficacy
+        - Mean Mask Efficacy by Dataset Group.png: Bar plot of mean efficacy
+        - Prediction of Classifier Correctness using Mask Efficacy Threshold.png
+
+Configuration Flags:
+--------------------
+    load (bool): If True, load pre-trained MaskInterpreter weights.
+                 Default: False
+    
+    train (bool): If True, train the MaskInterpreter model.
+                  Default: True
+    
+    num_samples (int): Number of samples to visualize.
+                       Default: 100
+    
+    num_samples_subset (int): Number of samples for computing metrics.
+                              Default: 500
+
+Key Classes and Functions:
+--------------------------
+    MaskInterpreter (keras.Model):
+        - __init__: Initialize with adaptor network and classifier
+        - compile: Set optimizer and loss weights
+        - train_step: Custom training loop with gradient augmentation
+        - call: Generate importance mask for input images
+        - predict_from_noisy: Get classifier prediction on adapted image
+    
+    Helper Functions:
+        - get_mask_efficacy: Compute PCC between original/adapted predictions
+        - compute_accuracy: Check if classifier predicts correct class
+        - compute_correctness: Binary correctness for batch of images
+        - evaluate_correctness_prediction: Evaluate threshold-based prediction
+
+Dependencies:
+-------------
+    - tensorflow / keras
+    - tensorflow_addons
+    - numpy
+    - matplotlib
+    - scipy
+    - sklearn
+    - tqdm
+    - Custom modules: metrics (tf_pearson_corr), callbacks, models.UNETO
+"""
+
 import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np

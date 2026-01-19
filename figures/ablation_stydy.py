@@ -5,20 +5,6 @@ import glob
 import os
 import re
 from figure_config import figure_config
-try:
-    from adjustText import adjust_text
-    HAS_ADJUSTTEXT = True
-    print("adjustText is installed.")
-except ImportError:
-    HAS_ADJUSTTEXT = False
-    print("Warning: adjustText not installed. Install with: pip install adjustText")
-try:
-    from brokenaxes import brokenaxes
-    HAS_BROKENAXES = True
-    print("brokenaxes is installed.")
-except ImportError:
-    HAS_BROKENAXES = False
-    print("Warning: brokenaxes not installed. Install with: pip install brokenaxes")
 
 # Path to CSV files
 csv_path = "/mnt/new_groups/assafza_group/assafza/lion_models/loss graphs/"
@@ -71,76 +57,6 @@ for csv_file in csv_files:
         'mask_weight': mask_weight,
         'zero_term': zero_term
     })
-
-# ============================================================================
-# Helper function to detect outliers and create axis ranges
-# ============================================================================
-def get_axis_breaks(values, metrics_list, axis_key, threshold=1.0):
-    """
-    Detect outliers and return axis ranges for broken axis.
-    Outliers are defined as:
-    - Last 3 configurations where s=0, t=2, m=1
-    - Where val_pcc=1
-    Returns: (main_range, outlier_ranges, has_outliers)
-    """
-    if not values or len(values) < 3:
-        return None, None, False
-    
-    # Identify outlier points based on specific criteria
-    outlier_indices = set()
-    
-    for i, metric in enumerate(metrics_list):
-        # Check if this is an outlier configuration
-        is_outlier = False
-        
-        # Check if val_pcc = 1
-        if 'val_pcc' in metric and metric['val_pcc'] >= 0.999:  # Using >= 0.999 to account for floating point
-            is_outlier = True
-        
-        # Check if val_similarity_loss > 2
-        if 'val_similarity_loss' in metric and metric['val_similarity_loss'] > 2:
-            is_outlier = True
-        
-        outlier_indices.add(i) if is_outlier else None
-    
-    if not outlier_indices:
-        return None, None, False
-    
-    # Separate values into main and outliers
-    main_values = [values[i] for i in range(len(values)) if i not in outlier_indices]
-    outlier_values = [values[i] for i in outlier_indices]
-    
-    if not main_values:
-        return None, None, False
-    
-    # Create ranges
-    main_min = min(main_values)
-    main_max = max(main_values)
-    main_range = max(main_max - main_min, (main_max + main_min) / 20)
-    
-    ranges = []
-    
-    # Check if there are outliers below the main range
-    lower_outliers = [v for v in outlier_values if v < main_min]
-    upper_outliers = [v for v in outlier_values if v > main_max]
-    
-    if lower_outliers:
-        lower_min = min(lower_outliers)
-        lower_max = max(lower_outliers)
-        lower_range = max(lower_max - lower_min, abs(lower_max) / 20) if lower_max != lower_min else abs(lower_max) * 0.1
-        ranges.append((lower_min - lower_range * 0.05, lower_max + lower_range * 0.05))
-        ranges.append((main_min - main_range * 0.05, main_max + main_range * 0.05))
-    else:
-        ranges.append((main_min - main_range * 0.05, main_max + main_range * 0.05))
-    
-    # Add upper outliers if they exist
-    if upper_outliers:
-        upper_min = min(upper_outliers)
-        upper_max = max(upper_outliers)
-        upper_range = max(upper_max - upper_min, abs(upper_max) / 20) if upper_max != upper_min else abs(upper_max) * 0.1
-        ranges.append((upper_min - upper_range * 0.05, upper_max + upper_range * 0.05))
-    
-    return ranges if len(ranges) > 1 else None, (main_min, main_max), len(outlier_indices) > 0
 
 # ============================================================================
 # Extract metrics at best epoch (min val_total_loss)

@@ -1,5 +1,5 @@
 import global_vars as gv
-from gui_logic import *
+from gui.gui_logic import *
 from PIL import Image
 import matplotlib.pyplot as plt
 from figure_config import figure_config

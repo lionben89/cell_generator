@@ -14,6 +14,8 @@ Deep learning models often operate as "black boxes," making it difficult to unde
 - **Model-agnostic** - Works with any differentiable predictor (classifiers, regressors, image-to-image models)
 - **Quantifiable explanations** - Mask efficacy measured via Pearson Correlation Coefficient (PCC)
 
+> **PyTorch Implementation**: For a PyTorch version of MaskInterpreter and tools for supervised prediction quality assessment at inference using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/Interpretability](https://github.com/zaritskylab/Interpretability)
+
 
 <p align="center">
   <img src="figures/figure1.png" alt="MaskInterpreter Architecture" width="800"/>

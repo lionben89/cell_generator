@@ -446,7 +446,7 @@ early_stopping_m1 = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
-save_path_m1 = "cellcycle_marker1.h5"
+save_path_m1 = "../../cell_cycle/cellcycle_marker1.h5"
 
 if not load:
     print("\nTraining Marker 1 model...")
@@ -780,7 +780,7 @@ axes[1, 1].set_title('Marker 2 Residual Plot - Perturbations')
 axes[1, 1].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('cellcycle_markers_perturbations_results.png', dpi=300, bbox_inches='tight')
+plt.savefig('../../cellcycle/cellcycle_markers_perturbations_results.png', dpi=300, bbox_inches='tight')
 print("\nVisualization saved to 'cellcycle_markers_perturbations_results.png'")
 plt.show()
 
@@ -830,7 +830,7 @@ for bar in bars2:
                      ha='center', va='bottom')
 
 plt.tight_layout()
-plt.savefig('cellcycle_test_vs_perturbations_comparison.png', dpi=300, bbox_inches='tight')
+plt.savefig('../../cellcycle/cellcycle_test_vs_perturbations_comparison.png', dpi=300, bbox_inches='tight')
 print("\nComparative plot saved to 'cellcycle_test_vs_perturbations_comparison.png'")
 plt.show()
 

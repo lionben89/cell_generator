@@ -85,7 +85,7 @@ early_stopping = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
-save_path = "cifar10_classifier.h5"
+save_path = "../../cifar10/cifar10_classifier.h5"
 
 if not load:
     # 4. Train the model using the training set and validate on the validation set

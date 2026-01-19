@@ -1,4 +1,4 @@
-model_type = "UNETP"
+model_type = "UNET"
 model_path = "./aae_model_ne_27_03_22_128_fl_next"
 interpert_model_path = "./unet_model_22_05_22_dna_128b"
 

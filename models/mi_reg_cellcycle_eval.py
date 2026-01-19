@@ -179,8 +179,8 @@ if __name__ == "__main__":
     print("\nLoading trained models...")
     
     # Load regressors
-    marker1_model = tf.keras.models.load_model('cellcycle_marker1.h5')
-    marker2_model = tf.keras.models.load_model('cellcycle_marker2.h5')
+    marker1_model = tf.keras.models.load_model('../../cellcycle/cellcycle_marker1.h5')
+    marker2_model = tf.keras.models.load_model('../../cellcycle/cellcycle_marker2.h5')
     
     # Load mask interpreters
     from models.MaskInterpreterRegression import MaskInterpreterRegression
@@ -230,12 +230,12 @@ if __name__ == "__main__":
     print("Loading Mask Interpreter weights...")
     
     # Load Marker 1 mask interpreter
-    mi_marker1_pt = keras.models.load_model("./cellcycle_mi_marker1")
+    mi_marker1_pt = keras.models.load_model("../../cellcycle/cellcycle_mi_marker1")
     mi_marker1.set_weights(mi_marker1_pt.get_weights())
     print("✓ Loaded Marker 1 mask interpreter weights")
     
     # Load Marker 2 mask interpreter
-    mi_marker2_pt = keras.models.load_model("./cellcycle_mi_marker2")
+    mi_marker2_pt = keras.models.load_model("../../cellcycle/cellcycle_mi_marker2")
     mi_marker2.set_weights(mi_marker2_pt.get_weights())
     print("✓ Loaded Marker 2 mask interpreter weights")
 
@@ -251,8 +251,8 @@ if __name__ == "__main__":
             print("="*60)
         
         # Create output directories
-        output_dir_m1 = f"./cellcycle_mi_images_marker1_{dataset_to_visualize}"
-        output_dir_m2 = f"./cellcycle_mi_images_marker2_{dataset_to_visualize}"
+        output_dir_m1 = f"../../cellcycle/cellcycle_mi_images_marker1_{dataset_to_visualize}"
+        output_dir_m2 = f"../../cellcycle/cellcycle_mi_images_marker2_{dataset_to_visualize}"
         
         try:
             os.makedirs(output_dir_m1, exist_ok=True)

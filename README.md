@@ -101,19 +101,15 @@ The script supports downloading the following organelles (uncomment in the `orga
 
 ```python
 organelles = {
-    "Desmosomes": [],
     "Golgi": [],
     "Microtubules": [],
     "Nuclear-envelope": [],
     "Actin-filaments": [],
-    "Plasma-membrane": [],
-    "Nucleolus-(Dense-Fibrillar-Component)": [],
     "Mitochondria": [],
     "Endoplasmic-reticulum": [],
-    "Tight-junctions": [],
     "Nucleolus-(Granular-Component)": [],
     "Actomyosin-bundles": [],
-    "Endosomes": []
+    "Plasma-membrane": [],
 }
 ```
 
@@ -385,13 +381,15 @@ python models/mi_reg_cellcycle_eval.py
 Demonstrated on image classification to show generality:
 
 ```bash
+# Train cifar10 classifier
 python clf-cifar10.py
 ```
 ```bash
+# Train MaskInterpreter for cifar10 and evaluate
 python models/MaskInterpreterCLF.py
 ```
 
-## Results
+## Cell cycle and CIFAR10 Results
 
 <p align="center">
   <img src="figures/results_comparison.png" alt="Results" width="800"/>

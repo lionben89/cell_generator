@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cell_generator"
+version = "0.1.0"
+description = "Cell generator and mask interpreter for interpretable cell image analysis"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "tensorflow-addons>=0.20.0",
+    "numpy==1.20.3",
+    "pandas>=1.5.3",
+    "scipy>=1.10.0",
+    "scikit-learn>=1.0.0",
+    "scikit-image>=0.16.2",
+    "matplotlib",
+    "seaborn>=0.12.0",
+    "opencv-python==4.8.0.74",
+    "aicsimageio>=3.0",
+    "tifffile",
+    "patchify>=0.1.9",
+    "tqdm>=4.60.0",
+    "h5py>=3.0.0",
+    "quilt3>=1.0.0",
+    "cell-imaging-utils>=1.0",
+]
+
+[tool.setuptools]
+packages = ["create_data", "figures", "gui", "models"]
+py-modules = ["callbacks", "dataset", "global_vars", "metrics", "mg_analyzer", "test", "train", "utils"]

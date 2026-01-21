@@ -52,12 +52,13 @@ conda create -n maskinterpreter python=3.9 tensorflow-gpu=2.6
 conda activate maskinterpreter
 ```
 
-3. **Install the package**
+3. **Install the package in editable mode**
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-This will install all dependencies from `requirements.txt` automatically.
+This will install all dependencies from `pyproject.toml` automatically
+
 
 ### Verify Installation
 
@@ -367,7 +368,7 @@ Extended to predict cell cycle markers (Cdt1, Geminin) from bright-field images:
 
 ```bash
 # Train cell cycle regressor
-python models/cellcycle-clf.py
+python models/regressor_cellcycle.py
 
 # Train MaskInterpreter for cell cycle
 python models/MaskInterpreterRegression.py

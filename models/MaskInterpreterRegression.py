@@ -152,21 +152,22 @@ from callbacks import *
 import os
 import glob
 import importlib
+from models.regressor_cellcycle import get_file_list, create_lazy_dataset, compute_dataset_statistics
 
 # Ensure eager execution (TF2 does this by default)
 tf.compat.v1.enable_eager_execution()
 
-from models.regressor_cellcycle import load_cell_cycle_data
+from models.regressor_cellcycle import adapt_batch_norm
 
 ###############--LOAD--##########################
 load = False
 train = True
-adabatch = False
+adabatch = True
 
 # Number of samples to visualize
 num_samples = 100
 num_samples_subset = 500
-
+base_dir = "/home/lionb/cell_cycle"
 
 class MaskInterpreterRegression(keras.Model):
     def __init__(self, patch_size, adaptor, regressor, pcc_target=0.9, **kwargs):
@@ -264,8 +265,13 @@ class MaskInterpreterRegression(keras.Model):
         return augmented_x
 
     def train_step(self, data):
-        # Expect data as input images
-        x = tf.cast(data, dtype=tf.float64)  # original input, shape (B, H, W, C)
+        # Unpack data (images and labels are provided, but we only use images)
+        if isinstance(data, tuple):
+            x, _ = data  # Unpack images and labels (labels not used in training)
+        else:
+            x = data
+        
+        x = tf.cast(x, dtype=tf.float64)  # original input, shape (B, H, W, C)
         
         # Compute regressor output on the original image (for loss computation)
         regressor_target = tf.cast(self.regressor(x), dtype=tf.float64)
@@ -348,54 +354,81 @@ class MaskInterpreterRegression(keras.Model):
         return pred_value_adapted
 
 
-###############--DATA LOADING--##########################
-# load_cell_cycle_data is imported from cellcycle-clf.py at the top of this file
-
-
 if __name__ == "__main__":
-    # Load pre-split datasets
+    # Load pre-split datasets using lazy loading
     base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
     
-    print("\nLoading training set...")
-    x_train, y_train = load_cell_cycle_data(os.path.join(base_data_dir, "train"))
+    print("\n" + "="*60)
+    print("Preparing Lazy Loading Datasets")
+    print("="*60)
     
-    print("\nLoading validation set...")
-    x_val, y_val = load_cell_cycle_data(os.path.join(base_data_dir, "val"))
+    print("\nScanning training files...")
+    train_files, train_samples = get_file_list(os.path.join(base_data_dir, "train"))
     
-    print("\nLoading test set...")
-    x_test, y_test = load_cell_cycle_data(os.path.join(base_data_dir, "test"))
+    print("\nScanning validation files...")
+    val_files, val_samples = get_file_list(os.path.join(base_data_dir, "val"))
     
-    # Normalize images using dataset-specific statistics
-    print("\nNormalizing images...")
-    x_train = x_train.astype("float32")
-    x_val = x_val.astype("float32")
-    x_test = x_test.astype("float32")
+    print("\nScanning test files...")
+    test_files, test_samples = get_file_list(os.path.join(base_data_dir, "test"))
     
-    # Compute mean and std for each dataset separately
-    mean_train = np.mean(x_train)
-    std_train = np.std(x_train)
-    mean_val = np.mean(x_val)
-    std_val = np.std(x_val)
-    mean_test = np.mean(x_test)
-    std_test = np.std(x_test)
+    # Compute normalization statistics from training set
+    print("\nComputing normalization statistics from training data...")
+    train_mean, train_std = compute_dataset_statistics(train_files, num_samples=10000)
     
-    print(f"Training set - Mean: {mean_train:.4f}, Std: {std_train:.4f}")
-    print(f"Validation set - Mean: {mean_val:.4f}, Std: {std_val:.4f}")
-    print(f"Test set - Mean: {mean_test:.4f}, Std: {std_test:.4f}")
+    # Create lazy loading datasets
+    batch_size_mi = 128
+    print(f"\nCreating lazy loading datasets with batch_size={batch_size_mi}...")
+    train_ds, _ = create_lazy_dataset(train_files, train_mean, train_std, shuffle=True, batch_size=batch_size_mi)
+    val_ds, _ = create_lazy_dataset(val_files, train_mean, train_std, shuffle=False, batch_size=batch_size_mi)
+    test_ds, _ = create_lazy_dataset(test_files, train_mean, train_std, shuffle=False, batch_size=batch_size_mi)
     
-    # Apply normalization
-    x_train = (x_train - mean_train) / std_train
-    x_val = (x_val - mean_val) / std_val
-    x_test = (x_test - mean_test) / std_test
+    print(f"\nLazy loading dataset summary:")
+    print(f"  Training samples: {train_samples}")
+    print(f"  Validation samples: {val_samples}")
+    print(f"  Test samples: {test_samples}")
     
     ###############--LOAD TRAINED REGRESSORS--##########################
     
     print("\nLoading trained regression models...")
-    marker1_model = tf.keras.models.load_model('cellcycle_marker1.h5')
+    marker1_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker1.h5')
     marker1_model.trainable = False
+    print("Marker 1 model loaded (weights frozen)")
     
-    marker2_model = tf.keras.models.load_model('cellcycle_marker2.h5')
+    marker2_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker2.h5')
     marker2_model.trainable = False
+    print("Marker 2 model loaded (weights frozen)")
+    
+    # Apply adaptive batch normalization if enabled
+    if adabatch:
+        print("\n" + "="*60)
+        print("Applying Adaptive Batch Normalization...")
+        print("="*60)
+        print("Loading adaptation batch from training data...")
+        
+        # Load a batch for adaptation
+        from models.regressor_cellcycle import load_sample_from_file
+        adapt_samples = []
+        adapt_count = 0
+        adapt_batch_size = 1000
+        
+        for file_info in train_files[:min(20, len(train_files))]:
+            num_timepoints = file_info[2]
+            for t in range(num_timepoints):
+                if adapt_count >= adapt_batch_size:
+                    break
+                bf, _ = load_sample_from_file(file_info, t)
+                bf_norm = (bf - train_mean) / train_std
+                adapt_samples.append(bf_norm)
+                adapt_count += 1
+            if adapt_count >= adapt_batch_size:
+                break
+        
+        adapt_data = np.array(adapt_samples)
+        print(f"Adapting batch normalization on {len(adapt_data)} samples...")
+        adapt_batch_norm(marker1_model, adapt_data, batch_size=32)
+        adapt_batch_norm(marker2_model, adapt_data, batch_size=32)
+        print("✓ Batch normalization adaptation complete")
+        del adapt_data, adapt_samples
     
     ###############--DEFINE ADAPTOR--##########################
     
@@ -454,8 +487,8 @@ if __name__ == "__main__":
     
     ###############--SETUP CALLBACKS--##########################
     
-    model_path_m1 = "./cellcycle_mi_marker1"
-    model_path_m2 = "./cellcycle_mi_marker2"
+    model_path_m1 = f"{base_dir}/cellcycle_mi_marker1"
+    model_path_m2 = f"{base_dir}/cellcycle_mi_marker2"
     
     checkpoint_callback_m1 = SaveModelCallback(
         1, mi_marker1, model_path_m1, 
@@ -486,11 +519,12 @@ if __name__ == "__main__":
         print("="*60)
         
         mi_marker1.fit(
-            x_train,
+            train_ds,
             epochs=200,
-            batch_size=128,
+            steps_per_epoch=train_samples // batch_size_mi,
             callbacks=[early_stop_callback, checkpoint_callback_m1],
-            validation_data=(x_val, None)
+            validation_data=val_ds,
+            validation_steps=val_samples // batch_size_mi
         )
         
         print("\n" + "="*60)
@@ -498,11 +532,12 @@ if __name__ == "__main__":
         print("="*60)
         
         mi_marker2.fit(
-            x_train,
+            train_ds,
             epochs=200,
-            batch_size=128,
+            steps_per_epoch=train_samples // batch_size_mi,
             callbacks=[early_stop_callback, checkpoint_callback_m2],
-            validation_data=(x_val, None)
+            validation_data=val_ds,
+            validation_steps=val_samples // batch_size_mi
         )
     
     print("\n" + "="*60)

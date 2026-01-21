@@ -104,6 +104,13 @@ Configuration Settings:
     
     create_all_predictions (bool): Whether to save all mask predictions as .npy.
                                    Default: True
+    
+    adabatch (bool): If True, apply adaptive batch normalization before
+                     making predictions on non-training datasets.
+                     This adapts the batch normalization statistics to the
+                     target dataset (val/test/perturbations) for better
+                     prediction accuracy.
+                     Default: True
 
 Key Functions:
 --------------
@@ -150,37 +157,71 @@ num_samples = 100  # Number of samples to visualize
 dataset_to_visualize = "perturbations"  # Options: "train", "val", "test"
 plot_examples = False  # Whether to generate visualization plots
 create_all_predictions = True  # Whether to save all mask predictions as .npy files
+adabatch = True  # Enable adaptive batch normalization for test/perturbation sets
 
 ###############--DATA LOADING--##########################
-from models.regressor_cellcycle import load_cell_cycle_data
+from models.regressor_cellcycle import get_file_list, compute_dataset_statistics, load_sample_from_file, adapt_batch_norm
 
 if __name__ == "__main__":
     # Load dataset
     base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
+    base_dir = "/home/lionb/cell_cycle"
     
-    print(f"\nLoading {dataset_to_visualize} set...")
-    x_data, y_data = load_cell_cycle_data(os.path.join(base_data_dir, dataset_to_visualize))
+    print("\n" + "="*60)
+    print("Preparing Lazy Loading for Evaluation")
+    print("="*60)
     
-    # Normalize images
-    print("\nNormalizing images...")
-    x_data = x_data.astype("float32")
+    # Scan training files to compute normalization statistics
+    print("\nScanning training files...")
+    train_files, train_samples = get_file_list(os.path.join(base_data_dir, "train"))
     
-    # Compute mean and std for normalization
-    mean = np.mean(x_data)
-    std = np.std(x_data)
-    print(f"{dataset_to_visualize.capitalize()} set - Mean: {mean:.4f}, Std: {std:.4f}")
+    # Compute normalization statistics from training set
+    print("\nComputing normalization statistics from training data...")
+    train_mean, train_std = compute_dataset_statistics(train_files, num_samples=10000)
     
-    # Apply normalization
-    x_data_norm = (x_data - mean) / std
-    x_data_orig = x_data  # Keep original for display
+    # Scan the dataset to visualize
+    print(f"\nScanning {dataset_to_visualize} files...")
+    data_files, data_samples = get_file_list(os.path.join(base_data_dir, dataset_to_visualize))
+    
+    print(f"\nDataset summary:")
+    print(f"  Training samples (for stats): {train_samples}")
+    print(f"  {dataset_to_visualize.capitalize()} samples: {data_samples}")
+    
+    # Load data samples on-demand for evaluation
+    print(f"\nLoading {min(num_samples, data_samples)} samples from {dataset_to_visualize} for evaluation...")
+    x_data_list = []
+    y_data_list = []
+    sample_count = 0
+    
+    for file_info in tqdm(data_files, desc="Loading samples"):
+        if sample_count >= num_samples:
+            break
+        num_timepoints = file_info[2]
+        for t in range(num_timepoints):
+            if sample_count >= num_samples:
+                break
+            bf, target = load_sample_from_file(file_info, t)
+            # Store original for display
+            x_data_list.append(bf)
+            y_data_list.append(target)
+            sample_count += 1
+    
+    x_data_orig = np.array(x_data_list)
+    y_data = np.array(y_data_list)
+    
+    # Normalize the data
+    print(f"\nNormalizing {len(x_data_orig)} samples...")
+    x_data_norm = (x_data_orig - train_mean) / train_std
+    
+    print(f"\nLoaded data shape: {x_data_orig.shape}")
     
     ###############--LOAD MODELS--##########################
     
     print("\nLoading trained models...")
     
     # Load regressors
-    marker1_model = tf.keras.models.load_model('../../cellcycle/cellcycle_marker1.h5')
-    marker2_model = tf.keras.models.load_model('../../cellcycle/cellcycle_marker2.h5')
+    marker1_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker1.h5')
+    marker2_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker2.h5')
     
     # Load mask interpreters
     from models.MaskInterpreterRegression import MaskInterpreterRegression
@@ -230,15 +271,52 @@ if __name__ == "__main__":
     print("Loading Mask Interpreter weights...")
     
     # Load Marker 1 mask interpreter
-    mi_marker1_pt = keras.models.load_model("../../cellcycle/cellcycle_mi_marker1")
+    mi_marker1_pt = keras.models.load_model(f"{base_dir}/cellcycle_mi_marker1")
     mi_marker1.set_weights(mi_marker1_pt.get_weights())
     print("✓ Loaded Marker 1 mask interpreter weights")
     
     # Load Marker 2 mask interpreter
-    mi_marker2_pt = keras.models.load_model("../../cellcycle/cellcycle_mi_marker2")
+    mi_marker2_pt = keras.models.load_model(f"{base_dir}/cellcycle_mi_marker2")
     mi_marker2.set_weights(mi_marker2_pt.get_weights())
     print("✓ Loaded Marker 2 mask interpreter weights")
 
+    # Apply adaptive batch normalization if enabled and not training set
+    # This is done once here and reused for both visualization and predictions
+    if adabatch and dataset_to_visualize != "train":
+        print("\n" + "="*60)
+        print("Applying Adaptive Batch Normalization...")
+        print("="*60)
+        print(f"Adapting batch normalization for {dataset_to_visualize} dataset...")
+        
+        # Use x_data_norm if available (from visualization), otherwise load a batch
+        if 'x_data_norm' in locals() and x_data_norm is not None and len(x_data_norm) > 0:
+            adapt_batch_norm(marker1_model, x_data_norm, batch_size=32)
+            adapt_batch_norm(marker2_model, x_data_norm, batch_size=32)
+        else:
+            # Load a batch for adaptation (used when only saving predictions)
+            print("Loading adaptation batch...")
+            adapt_samples = []
+            adapt_count = 0
+            adapt_batch_size = 1000
+            
+            for file_info in tqdm(data_files[:min(20, len(data_files))], desc="Loading adaptation batch"):
+                num_timepoints = file_info[2]
+                for t in range(num_timepoints):
+                    if adapt_count >= adapt_batch_size:
+                        break
+                    bf, _ = load_sample_from_file(file_info, t)
+                    bf_norm = (bf - train_mean) / train_std
+                    adapt_samples.append(bf_norm)
+                    adapt_count += 1
+                if adapt_count >= adapt_batch_size:
+                    break
+            
+            adapt_data = np.array(adapt_samples)
+            adapt_batch_norm(marker1_model, adapt_data, batch_size=32)
+            adapt_batch_norm(marker2_model, adapt_data, batch_size=32)
+            del adapt_data, adapt_samples
+        
+        print("✓ Batch normalization adaptation complete")
 
     
     ###############--VISUALIZATION--##########################
@@ -251,8 +329,8 @@ if __name__ == "__main__":
             print("="*60)
         
         # Create output directories
-        output_dir_m1 = f"../../cellcycle/cellcycle_mi_images_marker1_{dataset_to_visualize}"
-        output_dir_m2 = f"../../cellcycle/cellcycle_mi_images_marker2_{dataset_to_visualize}"
+        output_dir_m1 = f"{base_dir}/cellcycle_mi_images_marker1_{dataset_to_visualize}"
+        output_dir_m2 = f"{base_dir}/cellcycle_mi_images_marker2_{dataset_to_visualize}"
         
         try:
             os.makedirs(output_dir_m1, exist_ok=True)
@@ -444,31 +522,36 @@ if __name__ == "__main__":
             print(f"Error creating prediction directories: {e}")
             exit(1)
         
-        # Get list of all image files to match filenames
-        images_dir = os.path.join(base_data_dir, dataset_to_visualize, "images")
-        image_files = sorted(glob.glob(os.path.join(images_dir, "*.npy")))
-        
-        # Process all samples
-        for idx, img_file in enumerate(tqdm(image_files, desc="Saving predictions")):
+        # Process all files lazily (batch normalization already adapted above)
+        total_predictions = 0
+        for file_info in tqdm(data_files, desc="Saving predictions"):
+            img_file, label_file, num_timepoints, _ = file_info
             filename = os.path.basename(img_file)
             
-            # Get normalized image
-            img_norm = x_data_norm[idx]
-            
-            # Generate masks for both markers
-            mask_m1 = mi_marker1(np.expand_dims(img_norm, axis=0))
-            mask_m1 = np.squeeze(mask_m1)  # Convert to numpy and remove batch dim
-            
-            mask_m2 = mi_marker2(np.expand_dims(img_norm, axis=0))
-            mask_m2 = np.squeeze(mask_m2)
-            
-            # Save masks with the same filename as the original image
-            np.save(os.path.join(predictions_dir_m1, filename), mask_m1)
-            np.save(os.path.join(predictions_dir_m2, filename), mask_m2)
+            # Load and process each timepoint in this file
+            for t in range(num_timepoints):
+                bf, _ = load_sample_from_file(file_info, t)
+                bf_norm = (bf - train_mean) / train_std
+                
+                # Generate masks for both markers
+                mask_m1 = mi_marker1(np.expand_dims(bf_norm, axis=0))
+                mask_m1 = np.squeeze(mask_m1)  # Convert to numpy and remove batch dim
+                
+                mask_m2 = mi_marker2(np.expand_dims(bf_norm, axis=0))
+                mask_m2 = np.squeeze(mask_m2)
+                
+                # Create timepoint-specific filename
+                base_name = os.path.splitext(filename)[0]
+                pred_filename = f"{base_name}_t{t:04d}.npy"
+                
+                # Save masks
+                np.save(os.path.join(predictions_dir_m1, pred_filename), mask_m1)
+                np.save(os.path.join(predictions_dir_m2, pred_filename), mask_m2)
+                total_predictions += 1
         
         print(f"\nPrediction saving complete!")
         print(f"Marker 1 masks saved to: {predictions_dir_m1}")
         print(f"Marker 2 masks saved to: {predictions_dir_m2}")
-        print(f"Total predictions saved: {len(image_files)} per marker")
+        print(f"Total predictions saved: {total_predictions} per marker")
         print("="*60)
 

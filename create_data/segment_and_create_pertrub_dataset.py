@@ -7,8 +7,7 @@ import shutil
 from collections import OrderedDict
 from seg_proto import *
 import pandas as pd
-from aicsimageio import AICSImage
-import tifffile
+import imageio
 
 """This script will segment and stack the field of views (FOVs) pertrubed data from the Allen Inst. and will segment target organelles,
 stack all the relevant channels for that FOV.
@@ -47,8 +46,8 @@ organelle_segmentor_dict = {'Actin filaments':SegActinFilaments(), 'Lysosome':Se
         'Endoplasmic reticulum':SegER(), 'Golgi':SegGolgi(), 'Tight junctions':SegTightJunctions(), 'Microtubules':SegMicrotubules()}
 
 def imread(path):
-    reader = AICSImage(path) 
-    image = reader.data.astype(np.float32)
+    image = imageio.imread(path)
+    image = np.array(image).astype(np.float32)
     return image
 
 def segment_and_create_image(organelle,fov_path,fov_channel,structure_fl_channel,dna_fl_channel,mem_fl_channel,new_image_path):
@@ -98,7 +97,7 @@ def segment_and_create_image(organelle,fov_path,fov_channel,structure_fl_channel
         
          
         print("saving image: {}".format(new_image_path))
-        tifffile.imsave(new_image_path,new_image.astype(np.float16))
+        imageio.imwrite(new_image_path,new_image.astype(np.float16))
         print("saved image: {}".format(new_image_path))
 
 def cretae_metadata_file(metadata,organelle,drug):

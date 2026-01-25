@@ -16,16 +16,17 @@ data_provider = quilt3.Bucket("s3://allencell")
 #Path to data location in bucket
 download_path = "aics/pipeline_integrated_cell/"
 #where to save downloaded data
-storage_root = "/groups/assafza_group/assafza/full_cells_fovs/"
+storage_root = "/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/" #"/groups/assafza_group/assafza/full_cells_fovs/"
 #temp location to save data that is being processed (SSD memory)
-temp_storage_root = "/scratch/lionb@auth.ad.bgu.ac.il/{}/full_cells_fovs/".format(os.environ.get('SLURM_JOB_ID')) ##"/storage/users/assafzar/single_cells_fovs/"
+# temp_storage_root = "/scratch/lionb@auth.ad.bgu.ac.il/{}/full_cells_fovs/".format(os.environ.get('SLURM_JOB_ID')) ##"/storage/users/assafzar/single_cells_fovs/"
+temp_storage_root = "/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/"
 #path to metadata.csv
 datasets_metadata_dir = "{}metadata.csv".format(storage_root)
 #max number of images to download
-num_of_images_per_organelle = 200
-resacle_z = 3
+num_of_images_per_organelle = 10
+
 #what organelles to download
-organelles={"Endosomes":[]}#{"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
+organelles={"Nuclear-envelope":[]}#{"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
 
 ## instructions - channels in outputs images
 # 0-BF roi
@@ -43,9 +44,9 @@ organelles={"Endosomes":[]}#{"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nucle
 ## not found 'ATP2A2','HIST1H2BJ','NUP153','SMC1A','SON'
 
 #just create csvs without images
-only_csvs = True
+only_csvs = False
 #dowlowd and processed images that been processed in the past
-override = False
+override = True
 
 
 class LRUCache:
@@ -104,8 +105,19 @@ def download_image_if_not_exists(download_path,storage_path):
         ongoing_downloads[storage_path] = threading.Lock()
         ongoing_downloads[storage_path].acquire()
         ongoing_downloads_lock.release()
-        data_provider.fetch(download_path,storage_path)
-        ongoing_downloads[storage_path].release()
+        try:
+            data_provider.fetch(download_path,storage_path)
+            # Verify file was downloaded and is not empty
+            if not os.path.exists(storage_path) or os.path.getsize(storage_path) == 0:
+                print("ERROR: Failed to download {} to {} - file is empty or missing".format(download_path, storage_path))
+                if os.path.exists(storage_path):
+                    os.remove(storage_path)
+        except Exception as e:
+            print("ERROR: Exception while downloading {} to {}: {}".format(download_path, storage_path, str(e)))
+            if os.path.exists(storage_path):
+                os.remove(storage_path)
+        finally:
+            ongoing_downloads[storage_path].release()
     else:
         if (not(storage_path in ongoing_downloads)):
             ongoing_downloads[storage_path] = threading.Lock()
@@ -117,7 +129,14 @@ def get_image(storage_temp_fov):
   cache_lock.acquire()
   image = cache.get(storage_temp_fov)
   if (not isinstance(image,np.ndarray)):
-    print("loaded to cache".format(storage_temp_fov))
+    # Verify file exists and is not empty before reading
+    if not os.path.exists(storage_temp_fov):
+      cache_lock.release()
+      raise FileNotFoundError("File does not exist: {}".format(storage_temp_fov))
+    if os.path.getsize(storage_temp_fov) == 0:
+      cache_lock.release()
+      raise ValueError("File is empty: {}".format(storage_temp_fov))
+    print("loaded to cache: {}".format(storage_temp_fov))
     image = ImageUtils.image_to_ndarray(ImageUtils.imread(storage_temp_fov))
     cache.put(storage_temp_fov,image)
   cache_lock.release()

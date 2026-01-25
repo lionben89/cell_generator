@@ -457,7 +457,7 @@ if __name__ == "__main__":
         similarity_loss_weight=1.0,
         mask_loss_weight=1.0,
         noise_scale=0.5,
-        target_loss_weight=1.75
+        target_loss_weight=2.5
     )
     
     # Build the model
@@ -479,7 +479,7 @@ if __name__ == "__main__":
         similarity_loss_weight=1.0,
         mask_loss_weight=1.0,
         noise_scale=0.5,
-        target_loss_weight=1.75
+        target_loss_weight=2.5
     )
     
     # Build the model

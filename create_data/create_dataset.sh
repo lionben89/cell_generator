@@ -14,15 +14,15 @@
 
 
 module load anaconda              ### load anaconda module
-source activate cell_generator_new         ### activating environment, environment must be configured before running the job
+source activate maskinterpreter3         ### activating environment, environment must be configured before running the job
 
-export STORAGE_DIR=/storage/users/assafzar/full_cells_fovs
-export SLURM_SCRATCH_DIR=/scratch/lionb@auth.ad.bgu.ac.il/${SLURM_JOB_ID}/full_cells_fovs
+# export STORAGE_DIR=/storage/users/assafzar/full_cells_fovs
+# export SLURM_SCRATCH_DIR=/scratch/lionb@auth.ad.bgu.ac.il/${SLURM_JOB_ID}/full_cells_fovs
 
-mkdir $SLURM_SCRATCH_DIR
-##cp -r $STORAGE_DIR/* $SLURM_SCRATCH_DIR
+# mkdir $SLURM_SCRATCH_DIR
+#cp -r $STORAGE_DIR/* $SLURM_SCRATCH_DIR
 
-python -u segment_and_create_pertrub_dataset.py
+python -u download_and_create_dataset_full.py
 # python create_metadata.py
 
 ##\cp -r $SLURM_SCRATCH_DIR/* $STORAGE_DIR

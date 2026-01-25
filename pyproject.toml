@@ -18,13 +18,13 @@ dependencies = [
     "matplotlib",
     "seaborn>=0.12.0",
     "opencv-python==4.8.0.74",
-    "aicsimageio>=3.0",
-    "tifffile",
+    "imageio",
     "patchify>=0.1.9",
     "tqdm>=4.60.0",
     "h5py>=3.0.0",
     "quilt3>=1.0.0",
-    "cell-imaging-utils>=1.0",
+    "cell-imaging-utils>=1.16.4",
+    "imagecodecs",
 ]
 
 [tool.setuptools]

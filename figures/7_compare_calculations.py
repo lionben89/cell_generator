@@ -34,14 +34,14 @@ for param in params:
   gv.model_path = param["model"]
   gv.interpert_model_path = param["unet"]
   gv.organelle = param["organelle"]
-  # dataset_path = "{}/train_test_list/{}/image_list_test.csv".format(base_dir,param["organelle"])
-  # dataset = get_dataset(dataset_path)
-  # noise_scale = param["noise"]
-  # unet_model = load_model(param["unet"])
-  # mg_model = load_model(param["model"])
+  dataset_path = "{}/train_test_list/{}/image_list_test.csv".format(base_dir,param["organelle"])
+  dataset = get_dataset(dataset_path)
+  noise_scale = param["noise"]
+  unet_model = load_model(param["unet"])
+  mg_model = load_model(param["model"])
 
-  # selected_layer = unet_model.get_layer(layer_name)
-  # evaluate_interperters(param["model"],dataset,unet_model,mg_model,selected_layer,X_gradcam,noise_scale = noise_scale)    
+  selected_layer = unet_model.get_layer(layer_name)
+  evaluate_interperters(param["model"],dataset,unet_model,mg_model,selected_layer,X_gradcam,noise_scale = noise_scale)    
   png_filename = "{}/comparison.png".format(param["model"])
   legend = False
   # if i==3:

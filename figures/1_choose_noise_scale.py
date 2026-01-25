@@ -20,7 +20,7 @@ params = [
           {"organelle":"Nucleolus\n(Granular-Component)","model":"../unet_model_22_05_22_ngc_128"},
           {"organelle":"Mitochondria","model":"../unet_model_22_05_22_mito_128"},
           {"organelle":"Actomyosin-bundles","model":"../unet_model_22_05_22_bundles_128"},
-          {"organelle":"DNA","model":"../unet_model_22_05_22_dna_128"}
+          {"organelle":"DNA","model":"../unet_model_22_05_22_dna_128b"}
           ]
 
 gv.input = "channel_signal"

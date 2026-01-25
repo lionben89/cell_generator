@@ -76,10 +76,20 @@ print("MaskInterpreter imported successfully!")
 
 The project uses the Allen Cell Collection dataset from AWS S3. To download and prepare the full field-of-view (FOV) dataset:
 
+**Step 1: Download images**
 ```bash
 cd create_data
 python download_and_create_dataset_full.py
 ```
+
+**Step 2: Create metadata**
+
+After downloading the images, run the metadata creation script:
+```bash
+python create_metadata.py
+```
+
+This second step processes the downloaded images and generates the metadata CSV files required for training.
 
 ### Configuration Parameters
 
@@ -395,6 +405,41 @@ python models/MaskInterpreterCLF.py
 <p align="center">
   <img src="figures/results_comparison.png" alt="Results" width="800"/>
 </p>
+
+
+## Recreate Figures from Paper
+
+To reproduce all figures from the paper, run the scripts in the `figures/` folder in numerical order. 
+
+**Important**: Before running, update the following paths in each script:
+- Model checkpoint paths (trained MaskInterpreter and predictor models)
+- Data directory paths (Allen Cell Collection dataset location)
+- Output directory paths for generated figures
+
+### Running Scripts in Order
+
+```bash
+cd figures
+
+# 0. Reproduce U-Net scores
+python 0_reproduce_unet_scores.py
+
+# 1. Choose noise scale parameter
+python 1_choose_noise_scale.py
+
+# 2. Choose threshold for binarization
+python 2_choose_th.py
+
+# 3. Calculate U-Net prediction scores
+python 3_calculate_unet_scores.py
+
+# 4. Calculate explanation mask efficacy
+python 4_calculate_explanation_mask_efficacy.py
+
+...
+```
+
+**Note**: Some scripts may have dependencies on outputs from previous scripts. Run them in the order listed above to ensure all required intermediate files are generated.
 
 
 ## Citation

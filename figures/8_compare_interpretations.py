@@ -9,9 +9,9 @@ from figure_config import figure_config,scalebar,get_scalebar
 
 params = [
     {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise_vol":0.9,"slice":26},
-    # {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise_vol":0.3,"slice":29},
-    # {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise_vol":0.3,"slice":36},
-    # {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise_vol":0.8,"slice":22},
+    {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","noise_vol":0.3,"slice":29},
+    {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise_vol":0.3,"slice":36},
+    {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise_vol":0.8,"slice":22},
 ]
 
 def auto_balance(image):

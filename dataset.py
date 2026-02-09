@@ -88,18 +88,10 @@ class DataGen(keras.utils.Sequence):
                  #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = "/scratch/{}/{}/temp".format(
-            os.environ.get('LOGNAME'),os.environ.get('SLURM_JOB_ID'))
+        self.new_path_origin = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'temp')
         if delete_cahce:
-            try:
-                if os.path.exists(self.new_path_origin):
-                    shutil.rmtree(self.new_path_origin)
-            except Exception as e:
-                print("SSD storage is not exist in {}".format(self.new_path_origin))
-                print(e)
-                self.new_path_origin = "/groups/assafza_group/assafza/temp/{}".format(os.environ.get('LOGNAME'))
-                if os.path.exists(self.new_path_origin):
-                    shutil.rmtree(self.new_path_origin)
+            if os.path.exists(self.new_path_origin):
+                shutil.rmtree(self.new_path_origin)
 
         self.df = DatasetMetadataSCV(image_list_csv, image_list_csv)
         self.n = self.df.get_shape()[0]
@@ -168,7 +160,7 @@ class DataGen(keras.utils.Sequence):
         except Exception as e:
                 print("SSD storage is not exist in {}".format(self.new_path_origin))
                 print(e)
-                self.new_path_origin = "/groups/assafza_group/assafza/temp/{}".format(os.environ.get('LOGNAME'))
+                self.new_path_origin = os.path.join(os.environ.get('DATA_MODELS_PATH'), 'temp/{}'.format(os.environ.get('LOGNAME')))
                 if (not os.path.exists(self.new_path_origin)):
                     os.makedirs(self.new_path_origin)
 
@@ -212,18 +204,18 @@ class DataGen(keras.utils.Sequence):
                     image_path, self.input_col)
                 if (self.augment and input_image is not None):
                     # print(input_image.shape)
-                    input_image = np.rot90(input_image, axes=(1,2), k=k)
+                    input_image = np.rot90(input_image, axes=(2,3), k=k)
                     
                 if not self.for_clf:
                     target_image, new_target_path = self.get_image_from_ssd(
                         image_path, self.target_col)
                     if (self.augment and target_image is not None):
-                        target_image = np.rot90(target_image, axes=(1,2), k=k)
+                        target_image = np.rot90(target_image, axes=(2,3), k=k)
                 if self.predictors is not None:
                     pred_image, new_prediction_path = self.get_image_from_ssd(
                         image_path, "prediction")
                     if (self.augment and pred_image is not None):
-                        pred_image = np.rot90(pred_image, axes=(1,2), k=k)
+                        pred_image = np.rot90(pred_image, axes=(2,3), k=k)
 
                 if (input_image is None or (target_image is None and not self.for_clf)):
                     image_ndarray = ImageUtils.image_to_ndarray(
@@ -289,8 +281,8 @@ class DataGen(keras.utils.Sequence):
                         target_image += np.random.normal(0,
                                                         0.05, size=target_image.shape)
                         target_image = np.clip(target_image, 0, 1)
-                    input_image = np.expand_dims(input_image[0], axis=-1)
-                    target_image = np.expand_dims(target_image[0], axis=-1)
+                    # input_image = np.expand_dims(input_image[0], axis=-1)
+                    # target_image = np.expand_dims(target_image[0], axis=-1)
                     if get_size_in_GB(self.new_path_origin)<100:
                         ImageUtils.imsave(input_image, new_input_path)
                     if not self.for_clf:
@@ -337,6 +329,8 @@ class DataGen(keras.utils.Sequence):
                 else:
                     if (self.patches_from_image > 1):
                         # Sample patches
+                        input_image = np.moveaxis(input_image, 0,-1)
+                        target_image = np.moveaxis(target_image, 0,-1)
                         # input_image = ImageUtils.to_shape(input_image,input_image.shape,None, min_shape=self.patch_size)
                         # target_image = ImageUtils.to_shape(target_image,input_image.shape,None, min_shape=self.patch_size)
                         for k in range(self.patches_from_image):

@@ -167,7 +167,7 @@ adabatch = True
 # Number of samples to visualize
 num_samples = 100
 num_samples_subset = 500
-base_dir = "/home/lionb/cell_cycle"
+base_dir = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'cell_cycle')
 
 class MaskInterpreterRegression(keras.Model):
     def __init__(self, patch_size, adaptor, regressor, pcc_target=0.9, **kwargs):
@@ -356,7 +356,7 @@ class MaskInterpreterRegression(keras.Model):
 
 if __name__ == "__main__":
     # Load pre-split datasets using lazy loading
-    base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
+    base_data_dir = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'Gad/Cell_Cycle_Data')
     
     print("\n" + "="*60)
     print("Preparing Lazy Loading Datasets")

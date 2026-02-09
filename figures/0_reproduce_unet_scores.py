@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
 from dataset import DataGen
 import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
@@ -61,7 +62,7 @@ def plot_unet_scores():
 
 for param in params:
     print(param["organelle"])
-    ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"])
+    ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"]))
     dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0.0, max_precentage=1.0, augment=False)
     calc_unet_pcc(dataset, model_path=param["model"], weighted_pcc=weighted_pcc,images=range(min(10,dataset.df.data.shape[0])))
 

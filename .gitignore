@@ -32,8 +32,7 @@ MANIFEST
 *.tar
 *.npy
 *.pb
-/home/lionb/cell_generator/cellcycle_mi_marker1
-/home/lionb/cell_generator/cellcycle_mi_marker1/
+cellcycle_mi_marker1
 cellcycle_mi_marker1/
 .history
 .lh

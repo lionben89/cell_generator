@@ -23,7 +23,7 @@ dependencies = [
     "tqdm>=4.60.0",
     "h5py>=3.0.0",
     "quilt3>=1.0.0",
-    "cell-imaging-utils>=1.16.4",
+    "cell-imaging-utils>=1.17.0",
     "imagecodecs",
 ]
 

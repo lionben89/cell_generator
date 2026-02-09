@@ -135,7 +135,7 @@ if metrics_summary:
     configs_t6 = [m for m in metrics_summary if m['sim_weight'] == 1.0 and m['target_weight'] == 6.0 and m['mask_weight'] != 0.0]
     
     # Check if params_comparison.png exists
-    params_img_path = '/home/lionb/figures/params_comparison.png'
+    params_img_path = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'figures/params_comparison.png')
     has_params_img = os.path.exists(params_img_path)
     
     # New layout:
@@ -324,9 +324,10 @@ if metrics_summary:
         ax_params.axis('off')
         ax_params.text(-0.03, 1.03, 'D', transform=ax_params.transAxes, fontsize=10, fontweight='bold', va='top')
     
-    plt.savefig('/home/lionb/figures/ablation_study_combined.png',
+    save_path = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'figures/ablation_study_combined.png')
+    plt.savefig(save_path,
                 bbox_inches='tight', pad_inches=0.1, dpi=300)
-    print("\nSaved: /home/lionb/figures/ablation_study_combined.png")
+    print(f"\nSaved: {save_path}")
     plt.close()
 
 print("\nAblation study plots completed!")

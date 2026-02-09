@@ -114,7 +114,7 @@ def plot_manual_validation(image_index, param, save_path, steps, zoom_rect):
     gs = gridspec.GridSpec(4, steps, height_ratios=[1, 1, 1, 1])
     gs.update(wspace=0.1, hspace=0.3)
     model = keras.models.load_model(param["model"])
-    ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"])
+    ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"]))
     dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0.0, max_precentage=1.0, augment=False)
     for i, step in enumerate(step_reductions):
         print("step:",i)

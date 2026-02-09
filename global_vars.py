@@ -1,3 +1,5 @@
+import os
+
 model_type = "UNET"
 model_path = "./aae_model_ne_27_03_22_128_fl_next"
 interpert_model_path = "./unet_model_22_05_22_dna_128b"
@@ -20,7 +22,7 @@ target = "channel_target"
 
 organelle = "Mitochondria"
 
-train_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(organelle)
+train_ds_path = ''
 
-test_ds_path = "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_test.csv".format(organelle)
+test_ds_path = ''
 

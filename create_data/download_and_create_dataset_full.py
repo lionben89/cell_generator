@@ -16,10 +16,9 @@ data_provider = quilt3.Bucket("s3://allencell")
 #Path to data location in bucket
 download_path = "aics/pipeline_integrated_cell/"
 #where to save downloaded data
-storage_root = "/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/" #"/groups/assafza_group/assafza/full_cells_fovs/"
+storage_root = os.environ.get('EXAMPLE_DATA_PATH', '/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/') #"/groups/assafza_group/assafza/full_cells_fovs/"
 #temp location to save data that is being processed (SSD memory)
-# temp_storage_root = "/scratch/lionb@auth.ad.bgu.ac.il/{}/full_cells_fovs/".format(os.environ.get('SLURM_JOB_ID')) ##"/storage/users/assafzar/single_cells_fovs/"
-temp_storage_root = "/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/"
+temp_storage_root = os.environ.get('EXAMPLE_DATA_PATH', '/mnt/new_groups/assafza_group/assafza/lion_models_clean/example_data/')
 #path to metadata.csv
 datasets_metadata_dir = "{}metadata.csv".format(storage_root)
 #max number of images to download
@@ -137,7 +136,10 @@ def get_image(storage_temp_fov):
       cache_lock.release()
       raise ValueError("File is empty: {}".format(storage_temp_fov))
     print("loaded to cache: {}".format(storage_temp_fov))
-    image = ImageUtils.image_to_ndarray(ImageUtils.imread(storage_temp_fov))
+    read_image = ImageUtils.imread(storage_temp_fov)
+    # Transform ZCYX to CZYX by swapping axes 0 and 1
+    read_image = np.moveaxis(read_image, [0, 1], [1, 0])
+    image = ImageUtils.image_to_ndarray(read_image)
     cache.put(storage_temp_fov,image)
   cache_lock.release()
   return image
@@ -178,16 +180,19 @@ def download_and_create_image(fov_path,fov_channel,structure_fl_channel,dna_fl_c
         storage_temp_seg = "{}temp/{}".format(temp_storage_root,dna_seg_path)
         download_image_if_not_exists("{}{}".format(download_path,dna_seg_path),storage_temp_seg)      
         dna_seg_ndarray = get_image(storage_temp_seg)
+        dna_seg_ndarray = np.moveaxis(dna_seg_ndarray, [0, 1], [1, 0])
         new_image = ImageUtils.add_channel(new_image,dna_seg_ndarray)
         
         storage_temp_seg = "{}temp/{}".format(temp_storage_root,mem_seg_path)
         download_image_if_not_exists("{}{}".format(download_path,mem_seg_path),storage_temp_seg)      
         mem_seg_ndarray = get_image(storage_temp_seg)
+        mem_seg_ndarray = np.moveaxis(mem_seg_ndarray, [0, 1], [1, 0])
         new_image = ImageUtils.add_channel(new_image,mem_seg_ndarray)
         
         storage_temp_seg = "{}temp/{}".format(temp_storage_root,structure_seg_path)
         download_image_if_not_exists("{}{}".format(download_path,structure_seg_path),storage_temp_seg)      
         structure_seg_ndarray = get_image(storage_temp_seg)
+        structure_seg_ndarray = np.moveaxis(structure_seg_ndarray, [0, 1], [1, 0])
         new_image = ImageUtils.add_channel(new_image,structure_seg_ndarray)
         
          

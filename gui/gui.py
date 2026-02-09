@@ -12,8 +12,8 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 gv.patch_size = (32,128,128,1)
-gv.unet_model_path = "/sise/home/lionb/unet_model_22_05_22_ne_128"
-gv.mg_model_path = "/sise/home/lionb/mg_model_ne_10_06_22_5_0_new"
+gv.unet_model_path = os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'unet_model_22_05_22_ne_128')
+gv.mg_model_path = os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'mg_model_ne_10_06_22_5_0_new')
 gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
@@ -39,7 +39,7 @@ upper_layout = [
         sg.Input(
             key='-DATASET-',
             default_text=
-            "/sise/home/lionb/single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle),
+            os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), "single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)),
             size=(100, 1)),
         sg.FileBrowse(target='-DATASET-'),
         sg.Button('Load')

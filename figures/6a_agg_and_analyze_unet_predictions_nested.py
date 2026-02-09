@@ -2,13 +2,14 @@ import pandas as pd
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from tqdm import tqdm
 from scipy.stats import mannwhitneyu
 import math
 from figure_config import figure_config
 
 # Define the path to your CSV files
-path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"
+path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'full_cells_fovs/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv')
 
 columns_to_plot = ['Workflow']
 # List of columns with the results to plot
@@ -41,7 +42,7 @@ def plot_box_plots(data, columns, params):
                 control_organelle = param["organelle"]
                 
             train_test_df = pd.read_csv(path)
-            test_df = pd.read_csv(f"/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
+            test_df = pd.read_csv(os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), f'full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv'))
             control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
             
@@ -91,7 +92,7 @@ def plot_box_plots(data, columns, params):
             fig.delaxes(axes.flatten()[idx])
         
         # plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(f'/home/lionb/figures/{x_col}_comparison_unet2.png',bbox_inches='tight',pad_inches=0.05)
+        plt.savefig(os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), f'figures/{x_col}_comparison_unet2.png'),bbox_inches='tight',pad_inches=0.05)
         plt.close()
 
 # Function to plot nested box plots for two categorical variables
@@ -188,7 +189,7 @@ def plot_nested_boxplots(data, col1, col2, params):
         ax.grid(True, alpha=0.3, axis='y')
         
         plt.tight_layout()
-        plt.savefig(f'/home/lionb/figures/{param["organelle"]}_unet_nested_{col1}_{col2}.png', dpi=300)
+        plt.savefig(os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), f'figures/{param["organelle"]}_unet_nested_{col1}_{col2}.png'), dpi=300)
         plt.close()
 
 # Load the data

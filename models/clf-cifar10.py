@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 load = False
-base_dir = "/home/lionb/cifar10"
+base_dir = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'cifar10')
 # 1. Load and preprocess CIFAR-10 dataset
 print("Loading CIFAR-10 data...")
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()

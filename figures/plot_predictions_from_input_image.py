@@ -126,7 +126,7 @@ def generate_prediction_image(dataset, params, save_dir):
     plt.savefig(final_fig_path,bbox_inches='tight',pad_inches=0.05)
     plt.show()
 
-save_dir = "/sise/home/lionb/figures/predictions/test" #Endosomes_4
+save_dir = os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'figures/predictions/test') #Endosomes_4
 ds_path = f"{save_dir}/dataset.csv"
 dataset = DataGen(ds_path, "channel_signal", "channel_target", batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0.0, max_precentage=1.0, augment=False)
 generate_prediction_image(dataset, params, save_dir)

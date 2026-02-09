@@ -13,30 +13,29 @@ CONTINUE_TRAINING = False ## False to override current model with the same name
 
 #Model to train
 gv.model_type = "MG"
-for_clf = (gv.model_type == "CLF")
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_mito_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_ne_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_mito_13_05_24_noise_1.5_sim_0.0_target_6.0_mask_1.0_mse" ## the model will be saved here
+gv.model_path = "../mg_model_ne_13_05_24_noise_1.5_sim_0.0_target_6.0_mask_1.0_mse" ## the model will be saved here
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to train the model upon
-gv.organelle = "Mitochondria" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.train_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle)
-gv.test_ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle)
+gv.train_ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle))
+gv.test_ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = "/sise/home/lionb/single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug)
+    ds_path = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
 else:
     ds_path = gv.train_ds_path
     
@@ -47,8 +46,8 @@ gv.patch_size = (32,128,128,1)
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 print(gv.organelle)
 #example to add predictors to the dataset predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
-train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, predictors=None,delete_cahce=True)
-validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf,predictors=None)
+train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, predictors=None,delete_cahce=True)
+validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type, predictors=None)
 
 if (gv.model_type == "UNET"):
     from models.UNETO import *
@@ -83,8 +82,8 @@ elif (gv.model_type == "MG"):
     if weighted_pcc:
         dilate = weighted_pcc #False for regular pearson, True for modified
         gv.target = "structure_seg"
-        train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, for_clf=for_clf, dilate=dilate) 
-        validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type,for_clf=for_clf, dilate=dilate)
+        train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, dilate=dilate) 
+        validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type, dilate=dilate)
     
     interpert_model = keras.models.load_model(gv.interpert_model_path)
     interpert_model.summary()

@@ -32,7 +32,7 @@ xy_step = 64
 z_step = 16
 
 batch_size = 4    
-path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
+path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'full_cells_fovs/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv')
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -55,7 +55,7 @@ else:
     # Concatenate all DataFrames
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
-    base_dir = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/unet_predictions"
+    base_dir = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'full_cells_fovs/train_test_list/unet_predictions')
     create_dir_if_not_exist(base_dir)
     ds_path = "{}/metadata_with_efficacy_scores_and_unet_scores.csv".format(base_dir)
     metadata_with_efficacy_scores_df.to_csv(ds_path)

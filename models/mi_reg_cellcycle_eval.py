@@ -165,7 +165,7 @@ from models.regressor_cellcycle import get_file_list, compute_dataset_statistics
 if __name__ == "__main__":
     # Load dataset
     base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
-    base_dir = "/home/lionb/cell_cycle"
+    base_dir = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'cell_cycle')
     
     print("\n" + "="*60)
     print("Preparing Lazy Loading for Evaluation")
@@ -508,7 +508,7 @@ if __name__ == "__main__":
         print("="*60)
         
         # Create predictions directories next to images and labels
-        base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
+        base_data_dir = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'Gad/Cell_Cycle_Data')
         predictions_dir_m1 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker1")
         predictions_dir_m2 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker2")
         

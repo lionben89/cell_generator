@@ -23,7 +23,7 @@ gv.patch_size = (32,128,128,1)
 
 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
-base_dir = "/groups/assafza_group/assafza/full_cells_fovs"
+base_dir = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'full_cells_fovs')
 X_gradcam = False
 layer_name = "unet_convt_bottleneck2"
 

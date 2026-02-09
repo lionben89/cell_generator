@@ -19,7 +19,7 @@ import seaborn as sns
 import pandas as pd
 from figures.figure_config import figure_config
 
-root_dir = "/sise/home/lionb/"
+root_dir = os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), '')
 
 xy_step = 64
 z_step = 16

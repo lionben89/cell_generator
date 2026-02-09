@@ -128,7 +128,7 @@ train = False
 num_samples = 100
 # We'll use a (small) subset from train, val, test for speed.
 num_samples_subset = 500  # adjust as needed
-base_dir = "/home/lionb/cifar10"
+base_dir = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), 'cifar10')
 
 class MaskInterpreter(keras.Model):
     def __init__(self, patch_size, adaptor, classifier, weighted_pcc, pcc_target=0.9, **kwargs):

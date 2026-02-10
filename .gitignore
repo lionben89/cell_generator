@@ -26,7 +26,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-*.png
 *.h5
 *.npy
 *.tar
@@ -139,6 +138,6 @@ dmypy.json
 .history/*
 *.csv
 *.out
-*.sh
-
+figures/*.sh
 .vscode
+models/regressor_cellcycle.sh

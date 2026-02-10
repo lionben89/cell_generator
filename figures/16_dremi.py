@@ -317,7 +317,7 @@ def _vector_coerce_two_dense(x, y):
 
 # import pandas as pd
 
-# corr_df = pd.read_csv("/groups/assafza_group/assafza/full_cells_fovs/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv")
+# corr_df = pd.read_csv(os.path.join(os.environ['DATA_PATH'], "unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"))
 # x_col = '../mg_model_membrane_13_05_24_1.5'
 # y_col = '../unet_model_22_05_22_membrane_128'
 
@@ -343,7 +343,7 @@ def _vector_coerce_two_dense(x, y):
 # print("kNN-DREMI:", dremi_value_knn)
 # plot_scatter_with_shape_col(x,y,corr_df_temp['Workflow'].values,"scatter_{}".format("Plasma-membrane"))
 
-# # corr_df = pd.read_csv("/sise/home/lionb/cell_generator/figures/dna_correlation.csv")
+# # corr_df = pd.read_csv(os.path.join(os.environ['REPO_LOCAL_PATH'], "figures/dna_correlation.csv"))
 # x_col = '../mg_model_dna_13_05_24_1.5b'
 # y_col = '../unet_model_22_05_22_dna_128'
 

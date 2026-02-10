@@ -148,7 +148,7 @@ def predict_images_unet(dataset,model_path=gv.model_path,model=None,images=range
   
     return pccs
         
-# ds_path = "/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/unet_predictions/dataset.csv"
+# ds_path = os.path.join(os.environ['DATA_MODELS_PATH'], "full_cells_fovs_perturbation/train_test_list/unet_predictions/dataset.csv")
 for param in params:
     try:
         print(param["model"])

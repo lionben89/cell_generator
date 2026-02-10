@@ -9,7 +9,7 @@ import init_env_vars
 #and True if you wnt the same files for all organlles
 GLOBAL_LIST = False
 #The path to where the metadata of the downloaded images
-storage_root = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/') #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
+storage_root = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/') 
 #path to save to lists in the end
 if GLOBAL_LIST:
   lists_root_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_generator')

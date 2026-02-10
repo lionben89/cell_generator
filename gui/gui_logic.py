@@ -519,5 +519,5 @@ def load_scores(interpreter):
     scores_long = scores_long.rename(columns={'**': 'Pearson'})
     return scores_long
 
-# gv.mg_model_path = "/sise/home/lionb/mg_model_mito_10_06_22_5_0_new"
+# gv.mg_model_path = os.path.join(os.environ['REPO_LOCAL_PATH'], "mg_model_mito_10_06_22_5_0_new")
 # plot_evaluation_graph_std("{}/comparison.svg".format(gv.mg_model_path),["saliency","gradcam","mask_interperter"])

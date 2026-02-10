@@ -10,6 +10,7 @@ from dataset import DataGen
 import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from mg_analyzer import analyze_th
+import init_env_vars
 
 params = [
           # {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
@@ -23,7 +24,7 @@ params = [
           # {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
           # {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
           ]
-base_dir = "/groups/assafza_group/assafza/full_cells_fovs"
+base_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs')
 gv.input = "channel_signal"
 gv.target = "channel_target"
 weighted_pcc = False

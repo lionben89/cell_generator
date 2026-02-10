@@ -1,8 +1,120 @@
+"""
+MaskInterpreter for CIFAR-10 Classification
+============================================
+
+This script implements a MaskInterpreter model for generating interpretable
+importance masks that explain image classifier predictions. It is designed
+for the CIFAR-10 dataset and evaluates robustness on CIFAR-10-C corruptions.
+
+Overview:
+---------
+The MaskInterpreter learns to generate importance masks that identify which
+regions of an input image are critical for the classifier's prediction.
+The key insight is that if we perturb non-important regions with noise while
+preserving important regions, the classifier's output should remain similar.
+
+Architecture:
+-------------
+    1. Input Augmentation:
+       - Original image (32x32x3)
+       - Gradient magnitude channel: computes the gradient of the classifier's
+         max predicted probability w.r.t. the input, normalized to [0,1]
+       - Augmented input shape: (32x32x4)
+    
+    2. Generator Network:
+       - Conv2D preprocessing layer (32 filters, 3x3)
+       - Adaptor network (U-Net) that outputs importance mask (32x32x1)
+       - Mask values in [0,1] where 1 = important, 0 = not important
+    
+    3. Classifier:
+       - Pretrained CIFAR-10 classifier (frozen weights)
+       - Used to compute similarity between original and adapted predictions
+
+Training Objective:
+-------------------
+    The model is trained to minimize a composite loss:
+    
+    1. Similarity Loss (MSE):
+       - MSE between classifier outputs on original vs. adapted images
+       - Encourages the mask to preserve classifier-relevant information
+    
+    2. Mask Sparsity Loss (L1):
+       - Mean absolute value of the mask
+       - Encourages smaller masks (only highlight truly important regions)
+    
+    3. PCC Target Loss:
+       - |pcc_target - actual_pcc|
+       - Encourages predictions to maintain a target Pearson correlation
+       - pcc_target=0.95 means we want 95% correlation between outputs
+    
+    Total Loss = (similarity_loss * sim_weight) + 
+                 (mask_loss * mask_weight) + 
+                 (pcc_loss * target_weight)
+
+Mask Efficacy:
+--------------
+    Mask efficacy is measured as the Pearson Correlation Coefficient (PCC)
+    between the classifier's predictions on:
+    - The original image
+    - The adapted image (important regions preserved, others replaced with noise)
+    
+    Higher PCC = mask successfully identifies important regions
+    Lower PCC = mask fails to capture what the classifier uses
+
+Workflow:
+---------
+    1. Load pretrained CIFAR-10 classifier
+    2. Create MaskInterpreter with U-Net adaptor
+    3. Train on CIFAR-10 training data
+    4. Evaluate on test set and generate visualizations
+    5. Analyze correlation between mask efficacy and classifier accuracy
+    6. Find optimal threshold to predict classifier correctness
+
+Output Files:
+-------------
+    Model:
+        - cifar10_mi.h5: Trained MaskInterpreter weights
+    
+    Visualizations:
+        - cifar10_images/*.png: Per-sample visualizations (original, adapted, mask)
+        - mask_efficacy_boxplot.png: Boxplot of mask efficacy across datasets
+        - accuracy_boxplot.png: Boxplot of classifier accuracy across datasets
+        - correlation_mask_efficacy_vs_accuracy.png: Scatter plots per group
+        - mask_efficacy_median_barplot.png: Bar plot of median efficacy
+        - Mean Mask Efficacy by Dataset Group.png: Bar plot of mean efficacy
+        - Prediction of Classifier Correctness using Mask Efficacy Threshold.png
+
+Configuration Flags:
+--------------------
+    load (bool): If True, load pre-trained MaskInterpreter weights.
+                 Default: False
+    
+    train (bool): If True, train the MaskInterpreter model.
+                  Default: True
+    
+    num_samples (int): Number of samples to visualize.
+                       Default: 100
+    
+    num_samples_subset (int): Number of samples for computing metrics.
+                              Default: 500
+
+Key Classes and Functions:
+--------------------------
+    MaskInterpreter (keras.Model):
+        - __init__: Initialize with adaptor network and classifier
+        - compile: Set optimizer and loss weights
+        - train_step: Custom training loop with gradient augmentation
+        - call: Generate importance mask for input images
+        - predict_from_noisy: Get classifier prediction on adapted image
+
+"""
+
 import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 import tensorflow_addons as tfa  # if you use any tfa functions
 from metrics import tf_pearson_corr
+# from metrics import tf_pearson_corr
 from sklearn.model_selection import train_test_split
 from callbacks import *
 
@@ -10,13 +122,13 @@ from callbacks import *
 tf.compat.v1.enable_eager_execution()
 
 ###############--LOAD--##########################
-load = False
-train = True
+load = True
+train = False
 # Number of samples to visualize
 num_samples = 100
 # We'll use a (small) subset from train, val, test for speed.
 num_samples_subset = 500  # adjust as needed
-
+base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cifar10')
 
 class MaskInterpreter(keras.Model):
     def __init__(self, patch_size, adaptor, classifier, weighted_pcc, pcc_target=0.9, **kwargs):
@@ -196,7 +308,7 @@ class MaskInterpreter(keras.Model):
 
 if __name__ == "__main__":
     # Assume you have a pretrained classifier for CIFAR-10:
-    classifier = tf.keras.models.load_model('cifar10_classifier.h5')
+    classifier = tf.keras.models.load_model(f'{base_dir}/cifar10_classifier.h5')
     classifier.trainable = False
 
     # Define a simple adaptor network.
@@ -238,7 +350,7 @@ if __name__ == "__main__":
     x_val  = (x_val-mean)/std
     x_test  = (x_test-mean)/std
 
-    model_path = "cifar10_mi.h5"
+    model_path = f"{base_dir}/cifar10_mi.h5"
 
     # mask_interpreter.build(x_train.shape)
     checkpoint_callback = SaveModelCallback(1,mask_interpreter,model_path,monitor="val_stop",term="val_pcc",term_value=0.92)   
@@ -292,7 +404,7 @@ if __name__ == "__main__":
     x_test_orig = (x_test * std) + mean
     x_train_orig = (x_train * std) + mean 
     try:
-        os.mkdir("./cifar10_images")
+        os.mkdir(f"{base_dir}/cifar10_images")
     except Exception as e:
         pass
     for idx in sample_indices:
@@ -378,7 +490,7 @@ if __name__ == "__main__":
         plt.axis('off')
         
         plt.tight_layout()
-        plt.savefig("cifar10_images/{}.png".format(idx))
+        plt.savefig(f"{base_dir}/cifar10_images/{idx}.png")
         
         
     import os
@@ -402,16 +514,6 @@ if __name__ == "__main__":
         return pcc_value
 
 
-    # =============================================================================
-    # 2. Compute Mask Efficacy for Each CIFAR-10-C Corruption Type
-    # =============================================================================
-    print("Computing mask efficacy for CIFAR-10-C corruptions ...")
-
-    # Path to the CIFAR-10-C folder and list of corruption files
-    # (Assume cifar10c_folder is defined and points to the extracted CIFAR-10-C data)
-    dest_dir = "./data"
-    cifar10c_folder = os.path.join(dest_dir, "CIFAR-10-C")
-
     def compute_accuracy(img, true_label, classifier):
         """
         Compute a continuous measure of accuracy: the classifier's predicted probability 
@@ -431,7 +533,7 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------
     # Define the groups for which we want metrics:
-    # Groups: 'train', 'val', 'test', and each corruption type (from CIFAR-10-C)
+    # Groups: 'train', 'val', 'test'
     # ------------------------------------------------------------------
     mask_efficacy_dict = {}
     accuracy_dict = {}
@@ -472,64 +574,13 @@ if __name__ == "__main__":
         acc_test.append(compute_accuracy(img, lbl, classifier))
     mask_efficacy_dict['test'] = np.array(eff_test)
     accuracy_dict['test'] = np.array(acc_test)
-
-
-    # ------------------------------------------------------------------
-    # Process CIFAR-10-C corruption datasets.
-    # ------------------------------------------------------------------
-    # (Assume cifar10c_folder is the folder containing the CIFAR-10-C .npy files and labels.)
-    # Load CIFAR-10-C labels and select severity level 3 (index 2) if necessary.
-    cifar10c_labels_path = os.path.join(cifar10c_folder, "labels.npy")
-    cifar10c_labels = np.load(cifar10c_labels_path)
-    if cifar10c_labels.shape[0] == 50000:
-        # Reshape to (5, 10000) and select severity level 3 (index 2)
-        cifar10c_labels = cifar10c_labels.reshape(5, 10000)[1]
-
-    # List corruption files (skip labels)
-    corruption_files = sorted([f for f in os.listdir(cifar10c_folder) 
-                            if f.endswith('.npy') and f != "labels.npy"])
-
-    for file in tqdm(corruption_files):
-        corruption_name = file.split('.')[0]
-        file_path = os.path.join(cifar10c_folder, file)
-        
-        data = np.load(file_path)
-        # If data contains 5 severity levels, reshape and select severity level 3.
-        if data.shape[0] == 50000:
-            data = data.reshape(5, 10000, 32, 32, 3)[1]
-        elif data.shape[0] == 10000:
-            pass
-        else:
-            print(f"Unexpected shape for {file}: {data.shape}")
-        
-        # Convert images to float32 in [0,1] and then normalize using the same mean and std.
-        data = data.astype('float32') / 255.0
-        data_norm = (data - mean) / std  # shape: (n_samples, 32, 32, 3)
-        
-        n_samples = data_norm.shape[0]
-        # Optionally, use only a subset (e.g. first 200 images) to speed up computation.
-        subset = data_norm[:min(num_samples_subset, n_samples)]
-        subset_labels = cifar10c_labels[:min(num_samples_subset, n_samples)]
-        
-        eff_list = []
-        acc_list = []
-        print(corruption_name)
-        for i in tqdm(range(subset.shape[0])):
-            img = subset[i]
-            lbl = subset_labels[i]
-            eff_list.append(get_mask_efficacy(img, mask_interpreter))
-            acc_list.append(compute_accuracy(img, lbl, classifier))
-        
-        mask_efficacy_dict[corruption_name] = np.array(eff_list)
-        accuracy_dict[corruption_name] = np.array(acc_list)
-
+    
     # ------------------------------------------------------------------
     # Plotting: Create two boxplots (one for mask efficacy, one for accuracy).
     # ------------------------------------------------------------------
 
     # Order the groups: train, val, test, then sorted corruption names.
-    group_names = ['train', 'val', 'test'] + sorted([k for k in mask_efficacy_dict.keys() 
-                                                    if k not in ['train','val','test']])
+    group_names = ['train', 'val', 'test']
         
     # Prepare data lists in that order.
     efficacy_data = [mask_efficacy_dict[k] for k in group_names]
@@ -563,8 +614,7 @@ if __name__ == "__main__":
 
     # Define the group ordering.
     # Ensure that groups for train, val, and test come first, then the corruption groups sorted alphabetically.
-    group_names = ['train', 'val', 'test'] + sorted([k for k in mask_efficacy_dict.keys() 
-                                                    if k not in ['train','val','test']])
+    group_names = ['train', 'val', 'test']
 
     num_groups = len(group_names)
     cols = 3  # number of subplots per row; adjust as needed.
@@ -598,13 +648,12 @@ if __name__ == "__main__":
         ax.legend()
         
     plt.tight_layout()
-    plt.savefig("correlation_mask_efficacy_vs_accuracy.png")
+    plt.savefig(f"{base_dir}/correlation_mask_efficacy_vs_accuracy.png")
     plt.show()
 
 
     # Assuming group_names is defined as follows:
-    group_names = ['train', 'val', 'test'] + sorted([k for k in mask_efficacy_dict.keys() 
-                                                    if k not in ['train','val','test']])
+    group_names = ['train', 'val', 'test']
 
     # Compute the mean mask efficacy for each group.
     mean_efficacies = [np.median(mask_efficacy_dict[group]) for group in group_names]
@@ -627,141 +676,5 @@ if __name__ == "__main__":
     plt.title("Median Mask Efficacy by Dataset Group")
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.savefig("mask_efficacy_median_barplot.png")
+    plt.savefig(f"{base_dir}/mask_efficacy_median_barplot.png")
     plt.show()
-
-    import numpy as np
-    import tensorflow as tf
-    import matplotlib.pyplot as plt
-    import scipy.stats
-
-    # -------------------------
-    # 1. Compute ground truth "correctness" for a dataset.
-    # -------------------------
-    def compute_correctness(x, y, classifier):
-        """
-        Given normalized images x and ground truth labels y,
-        compute a binary vector (length = number of samples) where
-        1 indicates that the classifier's predicted label matches y, and 0 otherwise.
-        """
-        preds = classifier.predict(x)
-        pred_labels = np.argmax(preds, axis=1)
-        true_labels = y.squeeze()  # assume y has shape (N, 1)
-        correctness = (pred_labels == true_labels).astype(int)
-        return correctness
-
-    # -------------------------
-    # 2. Find optimal threshold on the validation set.
-    # -------------------------
-    # Assume mask efficacy values for the validation set are stored in mask_efficacy_dict['val']
-    # and that x_val and y_val are the validation images and labels.
-    # (mask_efficacy_dict['val'] should be a NumPy array of shape (N_val,))
-    val_eff = mask_efficacy_dict['val']  # e.g., computed earlier using your get_metrics_in_batches
-    val_correct = compute_correctness(x_val[:len(val_eff)], y_val[:len(val_eff)], classifier)
-
-    # Search for the threshold that maximizes the accuracy of predicting correctness.
-    # Here, we interpret: if mask efficacy >= TH then we predict that the classifier is correct.
-    candidate_thresholds = np.linspace(np.min(val_eff), np.max(val_eff), 100)
-    best_th = None
-    best_acc = -np.inf
-    for th in candidate_thresholds:
-        pred_correctness = (val_eff >= th).astype(int)
-        acc = np.mean(pred_correctness == val_correct)
-        if acc > best_acc:
-            best_acc = acc
-            best_th = th
-
-    print("Optimal threshold on validation set:", best_th)
-    print("Validation correctness prediction accuracy using TH =", best_th, ":", best_acc)
-
-    # -------------------------
-    # 3. Evaluate correctness prediction on other datasets.
-    # -------------------------
-    # For each dataset group, we use the mask efficacy value (from mask_efficacy_dict)
-    # and predict that the classifier is correct if mask efficacy >= best_th.
-    def evaluate_correctness_prediction(efficacy_array, x, y, classifier, th):
-        """
-        Given an array of mask efficacy values, and the corresponding images/labels,
-        compute the accuracy of predicting the classifier's correctness using threshold th.
-        """
-        # Ground truth correctness.
-        true_correctness = compute_correctness(x[:len(efficacy_array)], y[:len(efficacy_array)], classifier)
-        pred_correctness = (efficacy_array >= th).astype(int)
-        return np.mean(pred_correctness == true_correctness)
-
-    train_acc_pred = evaluate_correctness_prediction(mask_efficacy_dict['train'],
-                                                    x_train[:min(num_samples_subset, x_train.shape[0])],
-                                                    y_train[:min(num_samples_subset, x_train.shape[0])],
-                                                    classifier, best_th)
-    test_acc_pred = evaluate_correctness_prediction(mask_efficacy_dict['test'],
-                                                    x_test[:min(num_samples_subset, x_test.shape[0])],
-                                                    y_test[:min(num_samples_subset, x_test.shape[0])],
-                                                    classifier, best_th)
-    val_acc_pred = best_acc  # already computed for validation
-
-    print("Correctness prediction accuracy:")
-    print("  Train:", train_acc_pred)
-    print("  Validation:", val_acc_pred)
-    print("  Test:", test_acc_pred)
-
-    # If you have additional groups (e.g. CIFAR-10-C corruption groups) in mask_efficacy_dict:
-    corruption_results = {}
-    for group in sorted([g for g in mask_efficacy_dict.keys() if g not in ['train','val','test']]):
-        # You need to have the corresponding images and labels for the corruption group.
-        # For example, assume they are stored in variables corruption_images[group] and corruption_labels[group]
-        # Here, we will assume that they have been processed in the same way as above.
-        # For demonstration, we use the mask efficacy values from the dictionary and assume you can compute
-        # the ground truth correctness similarly.
-        # (Replace the following lines with your actual data for the corruption group.)
-        # For example:
-        #   eff_array = mask_efficacy_dict[group]
-        #   images = corruption_images[group]
-        #   labels = corruption_labels[group]
-        # Here we simply record None.
-        corruption_results[group] = None
-
-    # -------------------------
-    # 4. Plot a bar plot of correctness prediction accuracy.
-    # -------------------------
-    # We'll plot train, validation, and test.
-    groups_to_plot = ['train', 'val', 'test']
-    accuracy_scores = [train_acc_pred, val_acc_pred, test_acc_pred]
-
-    plt.figure(figsize=(8,6))
-    bars = plt.bar(groups_to_plot, accuracy_scores, color='lightgreen', edgecolor='black')
-    for bar in bars:
-        h = bar.get_height()
-        plt.annotate(f"{h:.4f}", 
-                    xy=(bar.get_x() + bar.get_width()/2, h), 
-                    xytext=(0, 3), 
-                    textcoords="offset points", 
-                    ha='center', va='bottom')
-    plt.ylabel("Correctness Prediction Accuracy")
-    plt.title("Prediction of Classifier Correctness using Mask Efficacy Threshold")
-    plt.tight_layout()
-    plt.savefig("Prediction of Classifier Correctness using Mask Efficacy Threshold.png")
-    plt.show()
-
-    # -------------------------
-    # 5. (Optional) Plot a bar plot of mean mask efficacy for each group.
-    # -------------------------
-    group_names = ['train', 'val', 'test'] + sorted([g for g in mask_efficacy_dict.keys() if g not in ['train','val','test']])
-    mean_efficacies = [np.mean(mask_efficacy_dict[g]) for g in group_names]
-
-    plt.figure(figsize=(12,6))
-    bars = plt.bar(group_names, mean_efficacies, color='skyblue', edgecolor='black')
-    for bar in bars:
-        h = bar.get_height()
-        plt.annotate(f"{h:.4f}",
-                    xy=(bar.get_x() + bar.get_width()/2, h),
-                    xytext=(0,3),
-                    textcoords="offset points",
-                    ha='center', va='bottom')
-    plt.xlabel("Dataset Group")
-    plt.ylabel("Mean Mask Efficacy (PCC)")
-    plt.title("Mean Mask Efficacy by Dataset Group")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig("Mean Mask Efficacy by Dataset Group.png")
-    plt.show()
-

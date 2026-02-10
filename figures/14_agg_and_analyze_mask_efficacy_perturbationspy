@@ -2,13 +2,14 @@ import pandas as pd
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from tqdm import tqdm
 from scipy.stats import mannwhitneyu
 import math
 from figure_config import figure_config
 
 # Define the path to your CSV files
-path = "/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv"
+path = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/train_test_list/**/image_list_with_metadata__with_efficacy_scores_full.csv')
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -32,30 +33,11 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv("/groups/assafza_group/assafza/full_cells_fovs_perturbation/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv", index=False)
+    metadata_with_efficacy_scores_df.to_csv(os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv'), index=False)
     # metadata_with_efficacy_scores_df = metadata_with_efficacy_scores_df[metadata_with_efficacy_scores_df['drug_label'].isin(['Vehicle','Staurosporine'])]
     # List of columns to plot unique values for
     columns_to_plot = [['PlateId']]#[['drug_label','time_point (hr)']]
 
-    # # Calculate the number of unique values for each column
-    # unique_values_counts = {column: len(metadata_with_efficacy_scores_df[column].drop_duplicates()) for column in columns_to_plot}
-
-    # # Plot unique values for each column
-    # plt.figure(figsize=(12, 8))
-    # plt.bar(unique_values_counts.keys(), unique_values_counts.values())
-    # plt.xlabel('Column Name')
-    # plt.ylabel('Number of Unique Values')
-    # plt.title('Number of Unique Values for Each Column')
-    # plt.xticks(rotation=45, ha='right')
-    # plt.tight_layout()
-    # plt.savefig('/sise/home/lionb/figures/unique_values_plot.png')
-    # plt.show()
-
-    # # Print unique values for each column
-    # for column in columns_to_plot:
-    #     unique_values = metadata_with_efficacy_scores_df[column].unique()
-    #     print(f"\nUnique values in {column}:")
-    #     print(unique_values)
 
 # List of columns with the results to plot
 params = [
@@ -93,8 +75,8 @@ def plot_box_plots(data, columns, params):
             else:
                 control_organelle = param["organelle"]
                 
-            train_test_df = pd.read_csv(f"/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv")
-            test_df = pd.read_csv(f"/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv")
+            train_test_df = pd.read_csv(os.path.join(os.environ['DATA_PATH'], f'{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv'))
+            test_df = pd.read_csv(os.path.join(os.environ['DATA_PATH'], f'{control_organelle}/image_list_test.csv'))
             control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
             
@@ -143,7 +125,7 @@ def plot_box_plots(data, columns, params):
             fig.delaxes(axes.flatten()[idx])
         
         # plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(f'/sise/home/lionb/figures/{x_col}_comparison_main2.png', bbox_inches='tight',pad_inches=0.05)
+        plt.savefig(os.path.join(os.environ['REPO_LOCAL_PATH'], f'figures/{x_col}_comparison_main2.png'), bbox_inches='tight',pad_inches=0.05)
         plt.close()
 
 # Plot box plots for each specified column and result column

@@ -1,3 +1,148 @@
+"""
+MaskInterpreter Evaluation Script for Cell Cycle Marker Regression
+===================================================================
+
+This script evaluates trained MaskInterpreter models on cell cycle data and
+generates visualizations and predictions showing which image regions are
+important for predicting cell cycle markers (Cdt1 and Geminin).
+
+Overview:
+---------
+The script loads pre-trained MaskInterpreter models and applies them to
+cell cycle microscopy images to:
+1. Generate importance masks that highlight regions critical for prediction
+2. Create visualizations comparing original vs. adapted (masked) images
+3. Save mask predictions as .npy files for downstream analysis
+
+This is the evaluation/inference companion to MaskInterpreterRegression.py
+which handles training.
+
+Workflow:
+---------
+    1. Load cell cycle dataset (train/val/test/perturbations)
+    2. Normalize images using dataset-specific statistics
+    3. Load pretrained regression models (Marker 1 and Marker 2)
+    4. Load trained MaskInterpreter models for both markers
+    5. Generate importance masks for all images
+    6. Optionally create per-sample visualizations
+    7. Optionally save all mask predictions as .npy files
+
+Visualization Output:
+---------------------
+    For each sample, generates a 4-panel figure showing:
+    
+    Panel 1: Original Image
+        - Grayscale brightfield image
+        - True marker value and predicted marker value
+    
+    Panel 2: Adapted (Noisy) Image
+        - Image with non-important regions replaced by noise
+        - Shows prediction on the adapted image
+    
+    Panel 3: Importance Mask
+        - Heatmap of importance values [0,1]
+        - High values (red) = important for prediction
+        - Low values (blue) = not important
+    
+    Panel 4: Mask Overlay
+        - Original image with mask overlaid (alpha=0.5)
+        - Shows mask efficacy (correlation between original/adapted predictions)
+
+Mask Efficacy:
+--------------
+    Measured as the Pearson correlation between:
+    - Regressor prediction on original image
+    - Regressor prediction on adapted image (important regions preserved)
+    
+    High efficacy (~1.0) = mask correctly identifies important regions
+    Low efficacy = mask fails to capture what the regressor uses
+
+Data Format:
+------------
+    Input Images (.npy):
+        - Shape: (T, C, Y, X) - loaded as (64, 64, 1) grayscale
+    
+    Input Labels (.npy):
+        - Shape: (C, T, N) - two markers: Cdt1 (0), Geminin (1)
+    
+    Output Masks (.npy):
+        - Shape: (64, 64) or (64, 64, 1)
+        - Values in [0, 1] representing importance
+
+Output Files:
+-------------
+    Visualizations (if plot_examples=True):
+        - ./cellcycle_mi_images_marker1_{dataset}/*.png
+        - ./cellcycle_mi_images_marker2_{dataset}/*.png
+    
+    Predictions (if create_all_predictions=True):
+        - {base_dir}/{dataset}/predictions_marker1/*.npy
+        - {base_dir}/{dataset}/predictions_marker2/*.npy
+        - Filenames match original image filenames
+
+Required Input Models:
+----------------------
+    Regressors:
+        - cellcycle_marker1.h5: Trained Cdt1 regressor
+        - cellcycle_marker2.h5: Trained Geminin regressor
+    
+    MaskInterpreters:
+        - ./cellcycle_mi_marker1/: Trained mask interpreter for Marker 1
+        - ./cellcycle_mi_marker2/: Trained mask interpreter for Marker 2
+
+Configuration Settings:
+-----------------------
+    num_samples (int): Number of samples to visualize.
+                       Default: 100
+    
+    dataset_to_visualize (str): Which dataset split to process.
+                                Options: "train", "val", "test", "perturbations"
+                                Default: "perturbations"
+    
+    plot_examples (bool): Whether to generate visualization plots.
+                          Default: False
+    
+    create_all_predictions (bool): Whether to save all mask predictions as .npy.
+                                   Default: True
+    
+    adabatch (bool): If True, apply adaptive batch normalization before
+                     making predictions on non-training datasets.
+                     This adapts the batch normalization statistics to the
+                     target dataset (val/test/perturbations) for better
+                     prediction accuracy.
+                     Default: True
+
+Key Functions:
+--------------
+    load_single_sample(img_file, labels_dir):
+        Load a single image-label pair for parallel processing.
+    
+    load_cell_cycle_data(data_dir, num_workers=None):
+        Load all data from directory using multiprocessing.
+
+Dependencies:
+-------------
+    - tensorflow / keras
+    - numpy
+    - matplotlib
+    - tqdm
+    - multiprocessing
+    - Custom modules: metrics (tf_pearson_corr), models.MaskInterpreterRegression, models.UNETO
+
+Usage:
+------
+    # Edit settings at top of script, then run:
+    $ python mi_reg_cellcycle_eval.py
+    
+    # To only generate predictions (no plots):
+    #   plot_examples = False
+    #   create_all_predictions = True
+    
+    # To only visualize samples (no bulk predictions):
+    #   plot_examples = True
+    #   create_all_predictions = False
+"""
+
 import os
 import glob
 import numpy as np
@@ -5,8 +150,6 @@ import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
-from functools import partial
 from metrics import tf_pearson_corr
 
 ###############--SETTINGS--##########################
@@ -14,108 +157,74 @@ num_samples = 100  # Number of samples to visualize
 dataset_to_visualize = "perturbations"  # Options: "train", "val", "test"
 plot_examples = False  # Whether to generate visualization plots
 create_all_predictions = True  # Whether to save all mask predictions as .npy files
+adabatch = True  # Enable adaptive batch normalization for test/perturbation sets
 
 ###############--DATA LOADING--##########################
-
-def load_single_sample(img_file, labels_dir):
-    """Load a single image-label pair. Used for parallel processing."""
-    try:
-        filename = os.path.basename(img_file)
-        label_file = os.path.join(labels_dir, filename)
-        
-        if not os.path.exists(label_file):
-            return None, None
-            
-        # Load image: T, C, Y, X - take first timepoint and channel
-        bf = np.load(img_file)[0, 0]  # Shape: (64, 64)
-        
-        # Load labels: C, T, 1 - take first timepoint for both channels
-        target = np.load(label_file)[:, 0, 0]  # Shape: (2,) - [marker1, marker2]
-        
-        return bf, target
-    except Exception as e:
-        print(f"Error loading {img_file}: {e}")
-        return None, None
-
-def load_cell_cycle_data(data_dir, num_workers=None):
-    """Load all cell cycle data from the given directory using parallel processing."""
-    images_dir = os.path.join(data_dir, "images")
-    labels_dir = os.path.join(data_dir, "labels")
-    
-    image_files = sorted(glob.glob(os.path.join(images_dir, "*.npy")))
-    
-    print(f"  Found {len(image_files)} files in {data_dir}")
-    
-    # Determine number of workers
-    if num_workers is None:
-        num_workers = max(1, cpu_count() - 1)
-    
-    print(f"  Loading with {num_workers} workers...")
-    
-    # Parallel loading with progress bar
-    load_func = partial(load_single_sample, labels_dir=labels_dir)
-    
-    with Pool(processes=num_workers) as pool:
-        results = list(tqdm(
-            pool.imap(load_func, image_files),
-            total=len(image_files),
-            desc="  Loading files",
-            unit="file"
-        ))
-    
-    # Filter out failed loads and separate images and labels
-    all_images = []
-    all_labels = []
-    
-    for bf, target in results:
-        if bf is not None and target is not None:
-            all_images.append(bf)
-            all_labels.append(target)
-    
-    # Convert to numpy arrays
-    images = np.array(all_images)
-    labels = np.array(all_labels)
-    
-    # Add channel dimension for grayscale images
-    images = np.expand_dims(images, axis=-1)  # Shape: (N, Y, X, 1)
-    
-    print(f"  Loaded {len(images)} samples")
-    print(f"  Image shape: {images.shape}")
-    print(f"  Labels shape: {labels.shape}")
-    
-    return images, labels
-
+from models.regressor_cellcycle import get_file_list, compute_dataset_statistics, load_sample_from_file, adapt_batch_norm
 
 if __name__ == "__main__":
     # Load dataset
-    base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
+    base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
+    base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_cycle')
     
-    print(f"\nLoading {dataset_to_visualize} set...")
-    x_data, y_data = load_cell_cycle_data(os.path.join(base_data_dir, dataset_to_visualize))
+    print("\n" + "="*60)
+    print("Preparing Lazy Loading for Evaluation")
+    print("="*60)
     
-    # Normalize images
-    print("\nNormalizing images...")
-    x_data = x_data.astype("float32")
+    # Scan training files to compute normalization statistics
+    print("\nScanning training files...")
+    train_files, train_samples = get_file_list(os.path.join(base_data_dir, "train"))
     
-    # Compute mean and std for normalization
-    mean = np.mean(x_data)
-    std = np.std(x_data)
-    print(f"{dataset_to_visualize.capitalize()} set - Mean: {mean:.4f}, Std: {std:.4f}")
+    # Compute normalization statistics from training set
+    print("\nComputing normalization statistics from training data...")
+    train_mean, train_std = compute_dataset_statistics(train_files, num_samples=10000)
     
-    # Apply normalization
-    x_data_norm = (x_data - mean) / std
-    x_data_orig = x_data  # Keep original for display
+    # Scan the dataset to visualize
+    print(f"\nScanning {dataset_to_visualize} files...")
+    data_files, data_samples = get_file_list(os.path.join(base_data_dir, dataset_to_visualize))
+    
+    print(f"\nDataset summary:")
+    print(f"  Training samples (for stats): {train_samples}")
+    print(f"  {dataset_to_visualize.capitalize()} samples: {data_samples}")
+    
+    # Load data samples on-demand for evaluation
+    print(f"\nLoading {min(num_samples, data_samples)} samples from {dataset_to_visualize} for evaluation...")
+    x_data_list = []
+    y_data_list = []
+    sample_count = 0
+    
+    for file_info in tqdm(data_files, desc="Loading samples"):
+        if sample_count >= num_samples:
+            break
+        num_timepoints = file_info[2]
+        for t in range(num_timepoints):
+            if sample_count >= num_samples:
+                break
+            bf, target = load_sample_from_file(file_info, t)
+            # Store original for display
+            x_data_list.append(bf)
+            y_data_list.append(target)
+            sample_count += 1
+    
+    x_data_orig = np.array(x_data_list)
+    y_data = np.array(y_data_list)
+    
+    # Normalize the data
+    print(f"\nNormalizing {len(x_data_orig)} samples...")
+    x_data_norm = (x_data_orig - train_mean) / train_std
+    
+    print(f"\nLoaded data shape: {x_data_orig.shape}")
     
     ###############--LOAD MODELS--##########################
     
     print("\nLoading trained models...")
     
     # Load regressors
-    marker1_model = tf.keras.models.load_model('cellcycle_marker1.h5')
-    marker2_model = tf.keras.models.load_model('cellcycle_marker2.h5')
+    marker1_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker1.h5')
+    marker2_model = tf.keras.models.load_model(f'{base_dir}/cellcycle_marker2.h5')
     
     # Load mask interpreters
-    from mi_reg_cellcycle import MaskInterpreterRegression
+    from models.MaskInterpreterRegression import MaskInterpreterRegression
     from models.UNETO import get_unet
     
     # Create adaptors
@@ -162,15 +271,52 @@ if __name__ == "__main__":
     print("Loading Mask Interpreter weights...")
     
     # Load Marker 1 mask interpreter
-    mi_marker1_pt = keras.models.load_model("./cellcycle_mi_marker1")
+    mi_marker1_pt = keras.models.load_model(f"{base_dir}/cellcycle_mi_marker1")
     mi_marker1.set_weights(mi_marker1_pt.get_weights())
     print("✓ Loaded Marker 1 mask interpreter weights")
     
     # Load Marker 2 mask interpreter
-    mi_marker2_pt = keras.models.load_model("./cellcycle_mi_marker2")
+    mi_marker2_pt = keras.models.load_model(f"{base_dir}/cellcycle_mi_marker2")
     mi_marker2.set_weights(mi_marker2_pt.get_weights())
     print("✓ Loaded Marker 2 mask interpreter weights")
 
+    # Apply adaptive batch normalization if enabled and not training set
+    # This is done once here and reused for both visualization and predictions
+    if adabatch and dataset_to_visualize != "train":
+        print("\n" + "="*60)
+        print("Applying Adaptive Batch Normalization...")
+        print("="*60)
+        print(f"Adapting batch normalization for {dataset_to_visualize} dataset...")
+        
+        # Use x_data_norm if available (from visualization), otherwise load a batch
+        if 'x_data_norm' in locals() and x_data_norm is not None and len(x_data_norm) > 0:
+            adapt_batch_norm(marker1_model, x_data_norm, batch_size=32)
+            adapt_batch_norm(marker2_model, x_data_norm, batch_size=32)
+        else:
+            # Load a batch for adaptation (used when only saving predictions)
+            print("Loading adaptation batch...")
+            adapt_samples = []
+            adapt_count = 0
+            adapt_batch_size = 1000
+            
+            for file_info in tqdm(data_files[:min(20, len(data_files))], desc="Loading adaptation batch"):
+                num_timepoints = file_info[2]
+                for t in range(num_timepoints):
+                    if adapt_count >= adapt_batch_size:
+                        break
+                    bf, _ = load_sample_from_file(file_info, t)
+                    bf_norm = (bf - train_mean) / train_std
+                    adapt_samples.append(bf_norm)
+                    adapt_count += 1
+                if adapt_count >= adapt_batch_size:
+                    break
+            
+            adapt_data = np.array(adapt_samples)
+            adapt_batch_norm(marker1_model, adapt_data, batch_size=32)
+            adapt_batch_norm(marker2_model, adapt_data, batch_size=32)
+            del adapt_data, adapt_samples
+        
+        print("✓ Batch normalization adaptation complete")
 
     
     ###############--VISUALIZATION--##########################
@@ -183,8 +329,8 @@ if __name__ == "__main__":
             print("="*60)
         
         # Create output directories
-        output_dir_m1 = f"./cellcycle_mi_images_marker1_{dataset_to_visualize}"
-        output_dir_m2 = f"./cellcycle_mi_images_marker2_{dataset_to_visualize}"
+        output_dir_m1 = f"{base_dir}/cellcycle_mi_images_marker1_{dataset_to_visualize}"
+        output_dir_m2 = f"{base_dir}/cellcycle_mi_images_marker2_{dataset_to_visualize}"
         
         try:
             os.makedirs(output_dir_m1, exist_ok=True)
@@ -362,7 +508,7 @@ if __name__ == "__main__":
         print("="*60)
         
         # Create predictions directories next to images and labels
-        base_data_dir = "/groups/assafza_group/assafza/Gad/Cell_Cycle_Data"
+        base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
         predictions_dir_m1 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker1")
         predictions_dir_m2 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker2")
         
@@ -376,31 +522,36 @@ if __name__ == "__main__":
             print(f"Error creating prediction directories: {e}")
             exit(1)
         
-        # Get list of all image files to match filenames
-        images_dir = os.path.join(base_data_dir, dataset_to_visualize, "images")
-        image_files = sorted(glob.glob(os.path.join(images_dir, "*.npy")))
-        
-        # Process all samples
-        for idx, img_file in enumerate(tqdm(image_files, desc="Saving predictions")):
+        # Process all files lazily (batch normalization already adapted above)
+        total_predictions = 0
+        for file_info in tqdm(data_files, desc="Saving predictions"):
+            img_file, label_file, num_timepoints, _ = file_info
             filename = os.path.basename(img_file)
             
-            # Get normalized image
-            img_norm = x_data_norm[idx]
-            
-            # Generate masks for both markers
-            mask_m1 = mi_marker1(np.expand_dims(img_norm, axis=0))
-            mask_m1 = np.squeeze(mask_m1)  # Convert to numpy and remove batch dim
-            
-            mask_m2 = mi_marker2(np.expand_dims(img_norm, axis=0))
-            mask_m2 = np.squeeze(mask_m2)
-            
-            # Save masks with the same filename as the original image
-            np.save(os.path.join(predictions_dir_m1, filename), mask_m1)
-            np.save(os.path.join(predictions_dir_m2, filename), mask_m2)
+            # Load and process each timepoint in this file
+            for t in range(num_timepoints):
+                bf, _ = load_sample_from_file(file_info, t)
+                bf_norm = (bf - train_mean) / train_std
+                
+                # Generate masks for both markers
+                mask_m1 = mi_marker1(np.expand_dims(bf_norm, axis=0))
+                mask_m1 = np.squeeze(mask_m1)  # Convert to numpy and remove batch dim
+                
+                mask_m2 = mi_marker2(np.expand_dims(bf_norm, axis=0))
+                mask_m2 = np.squeeze(mask_m2)
+                
+                # Create timepoint-specific filename
+                base_name = os.path.splitext(filename)[0]
+                pred_filename = f"{base_name}_t{t:04d}.npy"
+                
+                # Save masks
+                np.save(os.path.join(predictions_dir_m1, pred_filename), mask_m1)
+                np.save(os.path.join(predictions_dir_m2, pred_filename), mask_m2)
+                total_predictions += 1
         
         print(f"\nPrediction saving complete!")
         print(f"Marker 1 masks saved to: {predictions_dir_m1}")
         print(f"Marker 2 masks saved to: {predictions_dir_m2}")
-        print(f"Total predictions saved: {len(image_files)} per marker")
+        print(f"Total predictions saved: {total_predictions} per marker")
         print("="*60)
 

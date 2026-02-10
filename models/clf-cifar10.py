@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 load = False
-
+base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cifar10')
 # 1. Load and preprocess CIFAR-10 dataset
 print("Loading CIFAR-10 data...")
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
@@ -52,7 +52,7 @@ print("\nBuilding model...")
 #     tf.keras.layers.Dense(10, activation='softmax')
 # ])
 
-# Load pre-trained ResNet-50 model
+# Load pre-trained VGG19 model
 base_model = tf.keras.applications.VGG19(
     weights="imagenet",  # Load weights pre-trained on ImageNet
     include_top=False,   # Exclude the fully connected layers
@@ -85,7 +85,7 @@ early_stopping = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
-save_path = "cifar10_classifier.h5"
+save_path = f"{base_dir}/cifar10_classifier.h5"
 
 if not load:
     # 4. Train the model using the training set and validate on the validation set
@@ -118,114 +118,4 @@ print("CIFAR-10 Validation Accuracy: {:.4f}".format(val_acc))
 print("\nEvaluating on CIFAR-10 test set...")
 test_loss, test_acc = model.evaluate(x_test, y_test, verbose=0)
 print("CIFAR-10 Test Accuracy: {:.4f}".format(test_acc))
-
-
-# 5. Download and extract CIFAR-10-C (the corrupted version)
-def download_and_extract_cifar10c(download_url, dest_dir):
-    os.makedirs(dest_dir, exist_ok=True)
-    tar_path = os.path.join(dest_dir, "CIFAR-10-C.tar")
-    if not os.path.exists(tar_path):
-        print("\nDownloading CIFAR-10-C...")
-        urllib.request.urlretrieve(download_url, tar_path)
-        print("Download complete.")
-    else:
-        print("\nCIFAR-10-C tar file already exists.")
-
-    # Extract the tar file if the folder does not exist yet
-    extract_path = os.path.join(dest_dir, "CIFAR-10-C")
-    if not os.path.exists(extract_path):
-        print("Extracting CIFAR-10-C...")
-        with tarfile.open(tar_path, "r:") as tar:
-            tar.extractall(path=dest_dir)
-        print("Extraction complete.")
-    else:
-        print("CIFAR-10-C already extracted.")
-    return extract_path
-
-# URL for CIFAR-10-C (hosted on Zenodo)
-cifar10c_url = "https://zenodo.org/record/2535967/files/CIFAR-10-C.tar?download=1"
-data_dir = "./data"  # Directory for storing downloaded files
-
-cifar10c_folder = download_and_extract_cifar10c(cifar10c_url, data_dir)
-# 6. Evaluate the model on CIFAR-10-C corruptions
-print("\nEvaluating on CIFAR-10-C corruptions:")
-
-# List all .npy files in the folder (excluding the labels file)
-corruption_files = [f for f in os.listdir(cifar10c_folder) 
-                    if f.endswith('.npy') and f != "labels.npy"]
-
-# Load the CIFAR-10-C labels (ground-truth labels)
-labels_path = os.path.join(cifar10c_folder, "labels.npy")
-cifar10c_labels = np.load(labels_path)
-
-# If the labels have 50,000 entries (i.e. 5 severity levels concatenated),
-# reshape and select the same severity level as for the images.
-if cifar10c_labels.shape[0] == 50000:
-    cifar10c_labels = cifar10c_labels.reshape(5, 10000)[4]
-
-results = {}
-for file in sorted(corruption_files):
-    corruption_name = file.split('.')[0]
-    file_path = os.path.join(cifar10c_folder, file)
-    data = np.load(file_path)
-    
-    # If the data has 50,000 images, it includes 5 severity levels.
-    # Reshape to (5, 10000, 32, 32, 3) and select severity level 3 (index 2).
-    if data.shape[0] == 50000:
-        data = data.reshape(5, 10000, 32, 32, 3)
-        data = data[4]
-    elif data.shape[0] == 10000:
-        # Data is already for one severity level.
-        pass
-    else:
-        print(f"Unexpected shape for {file}: {data.shape}")
-    
-    # Normalize the images
-    data = data.astype("float32") / 255.0
-    # Compute the global mean and standard deviation over the training set.
-
-    # Normalize (scale) the training and test images.
-    data = (data - mean) / std
-
-    loss, acc = model.evaluate(data, cifar10c_labels, verbose=0)
-    results[corruption_name] = acc
-    print("Corruption: {:20s} - Accuracy: {:.4f}".format(corruption_name, acc))
-
-print("\nSummary of CIFAR-10-C results (severity level 3):")
-for corruption, acc in results.items():
-    print("  {} : {:.4f}".format(corruption, acc))
-
-import matplotlib.pyplot as plt
-
-# Create a dictionary that combines the accuracies for train, validation, test and all CIFAR-10-C corruption types.
-accuracy_scores = {
-    "train": train_acc,
-    "val": val_acc,
-    "test": test_acc
-}
-accuracy_scores.update(results)  # 'results' holds corruption accuracies from CIFAR-10-C
-
-# Extract group names and corresponding accuracy scores.
-groups = list(accuracy_scores.keys())
-scores = [accuracy_scores[group] for group in groups]
-
-# Create a bar plot.
-plt.figure(figsize=(12, 6))
-bars = plt.bar(groups, scores, color='skyblue', edgecolor='black')
-
-# Annotate each bar with its accuracy value.
-for bar in bars:
-    height = bar.get_height()
-    plt.annotate(f"{height:.4f}",
-                 xy=(bar.get_x() + bar.get_width() / 2, height),
-                 xytext=(0, 3),  # Offset the text by 3 points above the bar.
-                 textcoords="offset points",
-                 ha='center', va='bottom')
-
-plt.ylabel("Accuracy")
-plt.title("Accuracy Scores for Train, Val, Test, and CIFAR-10-C Corruptions")
-plt.xticks(rotation=45, ha="right")
-plt.tight_layout()
-plt.savefig("accuracy_barplot.png")
-plt.show()
 

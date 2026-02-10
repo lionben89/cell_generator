@@ -4,11 +4,13 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from dataset import DataGen
 import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from mg_analyzer import analyze_th
 from figure_config import figure_config
+import init_env_vars
 
 params = [
           {"organelle":"Nucleolus\n(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","noise":1.5},
@@ -73,12 +75,12 @@ def plot_th_analysis():
     plt.savefig("../figures/find_th.png",bbox_inches='tight', pad_inches=0.1)
 
 
-# for param in params:
-#     print(param["organelle"])
-#     ds_path = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/{}/image_list_test.csv".format(param["organelle"])
-#     dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
-#     print("# images in dataset:",dataset.df.data.shape[0])
-#     analyze_th(dataset,"agg",mask_image=None,manual_th="full",save_image=5,save_histo=False,weighted_pcc = weighted_pcc, model_path=param["model"],model=None,compound=None,images=range(min(10,dataset.df.data.shape[0])),noise_scale=param["noise"])
+for param in params:
+    print(param["organelle"])
+    ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(param["organelle"]))
+    dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
+    print("# images in dataset:",dataset.df.data.shape[0])
+    analyze_th(dataset,"agg",mask_image=None,manual_th="full",save_image=5,save_histo=False,weighted_pcc = weighted_pcc, model_path=param["model"],model=None,compound=None,images=range(min(10,dataset.df.data.shape[0])),noise_scale=param["noise"])
 plot_th_analysis()
 
 

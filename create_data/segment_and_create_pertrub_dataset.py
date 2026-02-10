@@ -7,8 +7,8 @@ import shutil
 from collections import OrderedDict
 from seg_proto import *
 import pandas as pd
-from aicsimageio import AICSImage
-import tifffile
+import imageio
+import init_env_vars
 
 """This script will segment and stack the field of views (FOVs) pertrubed data from the Allen Inst. and will segment target organelles,
 stack all the relevant channels for that FOV.
@@ -18,9 +18,9 @@ The data need to be dowloaded manually from https://www.allencell.org/data-downl
 #number of threads to run
 num_threads=1
 #where to save processed data
-storage_root = "/groups/assafza_group/assafza/full_cells_fovs_perturbation"
+storage_root = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation')
 #temp location to save data that is being processed (SSD memory)
-temp_storage_root = "/groups/assafza_group/assafza/full_cells_fovs_perturbation/raw"
+temp_storage_root = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/raw')
 #path to metadata.csv
 datasets_metadata_dir = "{}/drug_perturbation_dataset_2.csv".format(temp_storage_root)
 #what organelles to process
@@ -47,8 +47,8 @@ organelle_segmentor_dict = {'Actin filaments':SegActinFilaments(), 'Lysosome':Se
         'Endoplasmic reticulum':SegER(), 'Golgi':SegGolgi(), 'Tight junctions':SegTightJunctions(), 'Microtubules':SegMicrotubules()}
 
 def imread(path):
-    reader = AICSImage(path) 
-    image = reader.data.astype(np.float32)
+    image = imageio.imread(path)
+    image = np.array(image).astype(np.float32)
     return image
 
 def segment_and_create_image(organelle,fov_path,fov_channel,structure_fl_channel,dna_fl_channel,mem_fl_channel,new_image_path):
@@ -98,7 +98,7 @@ def segment_and_create_image(organelle,fov_path,fov_channel,structure_fl_channel
         
          
         print("saving image: {}".format(new_image_path))
-        tifffile.imsave(new_image_path,new_image.astype(np.float16))
+        imageio.imwrite(new_image_path,new_image.astype(np.float16))
         print("saved image: {}".format(new_image_path))
 
 def cretae_metadata_file(metadata,organelle,drug):

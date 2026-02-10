@@ -1,10 +1,11 @@
 import global_vars as gv
-from gui_logic import *
+from gui.gui_logic import *
 from PIL import Image
 import matplotlib.pyplot as plt
 from figure_config import figure_config
 import os
 import tensorflow as tf
+import init_env_vars
 
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
@@ -23,7 +24,7 @@ gv.patch_size = (32,128,128,1)
 
 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
-base_dir = "/groups/assafza_group/assafza/full_cells_fovs"
+base_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs')
 X_gradcam = False
 layer_name = "unet_convt_bottleneck2"
 
@@ -34,14 +35,14 @@ for param in params:
   gv.model_path = param["model"]
   gv.interpert_model_path = param["unet"]
   gv.organelle = param["organelle"]
-  # dataset_path = "{}/train_test_list/{}/image_list_test.csv".format(base_dir,param["organelle"])
-  # dataset = get_dataset(dataset_path)
-  # noise_scale = param["noise"]
-  # unet_model = load_model(param["unet"])
-  # mg_model = load_model(param["model"])
+  dataset_path = "{}/train_test_list/{}/image_list_test.csv".format(base_dir,param["organelle"])
+  dataset = get_dataset(dataset_path)
+  noise_scale = param["noise"]
+  unet_model = load_model(param["unet"])
+  mg_model = load_model(param["model"])
 
-  # selected_layer = unet_model.get_layer(layer_name)
-  # evaluate_interperters(param["model"],dataset,unet_model,mg_model,selected_layer,X_gradcam,noise_scale = noise_scale)    
+  selected_layer = unet_model.get_layer(layer_name)
+  evaluate_interperters(param["model"],dataset,unet_model,mg_model,selected_layer,X_gradcam,noise_scale = noise_scale)    
   png_filename = "{}/comparison.png".format(param["model"])
   legend = False
   # if i==3:

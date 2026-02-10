@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
+import init_env_vars
 
 """This script will create train and test lists in csv file for unpertrubed data, this script need to be run after the download_and_create script"""
 ## global vars
@@ -8,16 +9,16 @@ from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import Da
 #and True if you wnt the same files for all organlles
 GLOBAL_LIST = False
 #The path to where the metadata of the downloaded images
-storage_root = "/groups/assafza_group/assafza/full_cells_fovs/" #"/storage/users/assafzar/single_cells_fovs/" #"/scratch/lionb@auth.ad.bgu.ac.il/{}/single_cells_fovs/".format(os.environ.get('SLURM_JOB_ID'))
+storage_root = os.environ['EXAMPLE_DATA_PATH'] 
 #path to save to lists in the end
 if GLOBAL_LIST:
-  lists_root_dir = "/home/lionb/cell_generator"
+  lists_root_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_generator')
 else:
-  lists_root_dir = "/groups/assafza_group/assafza/full_cells_fovs/train_test_list/"
+  lists_root_dir = os.path.join(os.environ['EXAMPLE_DATA_PATH'], 'train_test_list/')
 #what organelles to process
-organelles={"Peroxisomes":[]} # organelles={"Tight junctions":[],"Golgi":[],"Actomyosin bundles":[],"Microtubules":[],"Actin filaments":[],"Endoplasmic reticulum":[],"Lysosome":[]} ## pertrub
+organelles={"Nuclear-envelope":[]} # organelles={"Tight junctions":[],"Golgi":[],"Actomyosin bundles":[],"Microtubules":[],"Actin filaments":[],"Endoplasmic reticulum":[],"Lysosome":[]} ## pertrub
 #% of images to be in the trainin set, the rest will be in the test set
-train_p = 1.0
+train_p = 0.0
 
 #the channel number in the stack image data
 target_channel = 3

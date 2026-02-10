@@ -8,6 +8,7 @@ from callbacks import *
 from metrics import *
 import pandas as pd
 from utils import *
+import init_env_vars
 
 CONTINUE_TRAINING = False ## False to override current model with the same name
 
@@ -27,15 +28,15 @@ gv.target = "channel_target"
 gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.train_ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_train.csv".format(gv.organelle))
-gv.test_ds_path = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), "full_cells_fovs/train_test_list/{}/image_list_test.csv".format(gv.organelle))
+gv.train_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_train.csv".format(gv.organelle))
+gv.test_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(gv.organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = os.path.join(os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
+    ds_path = os.path.join(os.environ['REPO_LOCAL_PATH'], "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
 else:
     ds_path = gv.train_ds_path
     

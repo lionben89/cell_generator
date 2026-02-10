@@ -11,6 +11,7 @@ from tqdm import tqdm
 import sklearn as sklearn
 import cv2
 from patchify import patchify
+import init_env_vars
 
 def get_size_in_GB(start_path = '.'):
     total_size = 0
@@ -88,7 +89,7 @@ class DataGen(keras.utils.Sequence):
                  #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = os.path.join(os.environ.get('DATA_MODELS_PATH', '/groups/assafza_group/assafza'), 'temp')
+        self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp')
         if delete_cahce:
             if os.path.exists(self.new_path_origin):
                 shutil.rmtree(self.new_path_origin)
@@ -160,7 +161,7 @@ class DataGen(keras.utils.Sequence):
         except Exception as e:
                 print("SSD storage is not exist in {}".format(self.new_path_origin))
                 print(e)
-                self.new_path_origin = os.path.join(os.environ.get('DATA_MODELS_PATH'), 'temp/{}'.format(os.environ.get('LOGNAME')))
+                self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp/{}'.format(os.environ['LOGNAME']))
                 if (not os.path.exists(self.new_path_origin)):
                     os.makedirs(self.new_path_origin)
 

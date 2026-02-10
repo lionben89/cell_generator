@@ -70,7 +70,94 @@ from models.MaskInterpreter import MaskInterpreter
 print("MaskInterpreter imported successfully!")
 ```
 
-## Data Download
+## Download Trained Models and Example Data
+
+Pre-trained models and example data are available from Zenodo for quick start and reproducibility.
+
+### Download from Zenodo
+
+Visit the Zenodo repository to download the required files:
+
+**Zenodo Link:** [https://zenodo.org/records/18590674](https://zenodo.org/records/18590674)
+
+The archive contains:
+- **Pre-trained in silico labeling models** - Trained on various organelles
+- **Pre-trained MaskInterpreter models** - Corresponding interpretation models for each predictor
+- **Example data** - Sample images with metadata for testing and validation
+
+### Extraction and Setup
+
+After downloading, extract the contents and set the paths accordingly:
+
+```bash
+# Download the archive from Zenodo
+wget https://zenodo.org/records/18590674/files/models_and_data.zip
+
+# Extract to your desired location
+unzip models_and_data.zip -d /path/to/your/directory
+
+# The extracted files will contain:
+# - models/ (pre-trained models)
+# - data/ (example dataset with train/test CSV files)
+```
+
+Make sure to update your environment variables (see next section) to point to these directories.
+
+## Environment Variables
+
+The project uses environment variables to configure paths for data, models, and the repository. You should set these before running scripts or notebooks:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `REPO_LOCAL_PATH` | Root path to the cloned repository | `/home/username/cell_generator` |
+| `DATA_PATH` | Directory containing training/test CSV files | `/path/to/data/train_test_list/` |
+| `MODELS_PATH` | Directory containing pre-trained models | `/path/to/models/` |
+
+### Setting Environment Variables
+
+**In your shell (bash):**
+```bash
+export REPO_LOCAL_PATH="/home/username/cell_generator"
+export DATA_PATH="/path/to/data/train_test_list/"
+export MODELS_PATH="/path/to/models/"
+```
+
+**In Python scripts or notebooks:**
+```python
+import os
+os.environ['REPO_LOCAL_PATH'] = "/home/username/cell_generator"
+os.environ['DATA_PATH'] = "/path/to/data/train_test_list/"
+os.environ['MODELS_PATH'] = "/path/to/models/"
+```
+
+## Quick Start with Example Notebook
+
+The [example.ipynb](example.ipynb) notebook provides a complete walkthrough of loading a pre-trained MaskInterpreter model and analyzing explanation masks. It demonstrates:
+
+1. **Environment setup** - Setting required environment variables
+2. **Loading data** - Using the DataGen class to load test images
+3. **Loading models** - Loading pre-trained predictor and MaskInterpreter models
+4. **Generating masks** - Creating importance masks for test images
+5. **Mask analysis** - Calculating mask efficacy (PCC) and mask size metrics
+6. **Visualization** - Plotting original images, predictions, masks, and noisy predictions
+
+### Running the Example
+
+Before running the notebook, ensure you have:
+- Set the environment variables (`REPO_LOCAL_PATH`, `DATA_PATH`, `MODELS_PATH`)
+- Downloaded the example data or have your own dataset prepared
+- Pre-trained models available in the `MODELS_PATH` directory
+
+Open the notebook:
+```bash
+jupyter notebook example.ipynb
+```
+
+Or use VS Code's built-in Jupyter support to run the cells interactively.
+
+The notebook will guide you through the complete analysis pipeline and generate visualizations showing how MaskInterpreter identifies important regions in your images.
+
+## Full Data Download
 
 ### Allen Cell Collection Dataset
 

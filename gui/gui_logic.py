@@ -18,8 +18,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from figures.figure_config import figure_config
+import init_env_vars
 
-root_dir = os.path.join('/sise', os.environ.get('REPO_LOCAL_PATH', '/home/lionb'), '')
+root_dir = os.environ['REPO_LOCAL_PATH']
 
 xy_step = 64
 z_step = 16

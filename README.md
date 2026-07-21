@@ -201,7 +201,7 @@ CWD = 'current working dir'
 ## 9. [Recreate Figures from Paper](md/reproduce.md)
 
 ## PyTorch Implementation
-> **PyTorch Implementation and implementation of supervised confidence model**: For a PyTorch version of MaskInterpreter and tools for assessing the supervised prediction quality at inference time using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/Interpretability](https://github.com/zaritskylab/Interpretability)
+> **PyTorch Implementation and implementation of supervised confidence model**: For a PyTorch version of MaskInterpreter and tools for assessing the supervised prediction quality at inference time using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/MaskInterpreter-Applications](https://github.com/zaritskylab/MaskInterpreter-Applications)
 
 ## Citation
 

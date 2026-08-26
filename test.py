@@ -22,20 +22,20 @@ gv.input = "channel_signal"
 gv.target = "channel_dna"
 
 #Organelle to predict the model upon
-gv.organelle = "Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+organelle = "Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #Actomyosin-bundles
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(gv.organelle))
+test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
+    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(organelle,compound,drug))
 else:
-    ds_path = gv.test_ds_path
+    ds_path = test_ds_path
 
 gv.batch_size = 8
 norm_type = "std" #"minmax"#"std"#
@@ -44,7 +44,7 @@ gv.patch_size = (32,128,128,1)
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 
 print("Model: ",gv.model_path)
-print("Organelle: ",gv.organelle)
+print("Organelle: ",organelle)
 print("Compound: ",compound)
 print("Vehicle: ", drug)
 

@@ -1,6 +1,6 @@
 # Quick Start with Example Notebook
 
-The [example.ipynb](example.ipynb) notebook provides a complete walkthrough of loading a pre-trained MaskInterpreter model and analyzing explanation masks. It demonstrates:
+The [example.ipynb](../example.ipynb) notebook provides a complete walkthrough of loading a pre-trained MaskInterpreter model and analyzing explanation masks. It demonstrates:
 
 1. **Environment setup** - Setting required paths
 2. **Loading data** - Using the DataGen class to load test images
@@ -13,8 +13,9 @@ The [example.ipynb](example.ipynb) notebook provides a complete walkthrough of l
 
 Before running the notebook, ensure you have:
 - Configured paths in `global_vars.py` or in the notebook
-- Downloaded the example data or have your own dataset prepared
-- Pre-trained models available in the configured models directory
+- Downloaded example data and pre-trained model (see general readme for details)
+    - Downloaded the example data or have your own dataset prepared
+    - Pre-trained models available in the configured models directory
 
 Open the notebook:
 ```bash

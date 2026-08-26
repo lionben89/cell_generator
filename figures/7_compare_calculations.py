@@ -33,7 +33,7 @@ i = 0
 for param in params:
   gv.model_path = param["model"]
   gv.interpert_model_path = param["unet"]
-  gv.organelle = param["organelle"]
+  organelle = param["organelle"]
   dataset_path = "{}/train_test_list/{}/image_list_test.csv".format(base_dir,param["organelle"])
   dataset = get_dataset(dataset_path)
   noise_scale = param["noise"]

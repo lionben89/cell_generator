@@ -22,10 +22,10 @@ temp_storage_root = gv.DATA_PATH
 #path to metadata.csv
 datasets_metadata_dir = "{}metadata.csv".format(storage_root)
 #max number of images to download
-num_of_images_per_organelle = 10
+num_of_images_per_organelle = 200
 
 #what organelles to download
-organelles={"Nuclear-envelope":[]}#{"Desmosomes":[],"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
+organelles={"Nuclear-envelope":[],"Golgi":[],"Microtubules":[],"Actin-filaments":[],"Plasma-membrane":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[]}
 
 ## instructions - channels in outputs images
 # 0-BF roi

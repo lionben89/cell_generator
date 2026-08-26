@@ -20,9 +20,4 @@ batch_norm = True
 input = "channel_signal"
 target = "channel_target"
 
-organelle = "Mitochondria"
-
-train_ds_path = ''
-
-test_ds_path = ''
 

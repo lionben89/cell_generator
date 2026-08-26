@@ -2,7 +2,7 @@
 
 ## Allen Cell Collection Dataset
 
-The project uses the Allen Cell Collection dataset from AWS S3. To download and prepare the full field-of-view (FOV) dataset:
+The project uses the Allen Cell Collection dataset from AWS S3, aics/hipsc_single_cell_image_dataset bucket. To download and prepare the full field-of-view (FOV) dataset:
 
 **Step 1: Download images**
 ```bash
@@ -21,7 +21,7 @@ This second step processes the downloaded images and generates the metadata CSV 
 
 ## Configuration Parameters
 
-Edit the script to customize the download. Key parameters in `download_and_create_dataset_full.py`:
+Edit the script to customize the download. Key parameters in [`download_and_create_dataset_full.py`](../create_data/download_and_create_dataset_full.py):
 
 | Parameter | Description | Default Value |
 |-----------|-------------|---------------|
@@ -30,13 +30,13 @@ Edit the script to customize the download. Key parameters in `download_and_creat
 | `temp_storage_root` | Temporary directory for processing (use SSD for speed) | `"/path/to/temp"` |
 | `num_of_images_per_organelle` | Maximum images to download per organelle | `200` |
 | `resacle_z` | Z-axis rescaling factor | `3` |
-| `only_csvs` | If `True`, creates metadata CSVs only (no images) | `True` |
+| `only_csvs` | If `True`, creates metadata CSVs only (no images) | `False` |
 | `override` | If `True`, re-downloads existing images | `False` |
 | `organelles` | Dictionary of organelles to download | See below |
 
 ## Available Organelles
 
-The script supports downloading the following organelles (uncomment in the `organelles` dictionary):
+The script supports downloading the following organelles:
 
 ```python
 organelles = {

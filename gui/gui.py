@@ -14,7 +14,7 @@ for gpu in gpus:
 gv.patch_size = (32,128,128,1)
 gv.unet_model_path = os.path.join(gv.CWD, 'unet_model_22_05_22_ne_128')
 gv.mg_model_path = os.path.join(gv.CWD, 'mg_model_ne_10_06_22_5_0_new')
-gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
 upper_layout = [
@@ -39,7 +39,7 @@ upper_layout = [
         sg.Input(
             key='-DATASET-',
             default_text=
-            os.path.join( gv.CWD, "single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)),
+            os.path.join( gv.CWD, "single_cell_training_from_segmentation/{}/image_list_train.csv".format(organelle)),
             size=(100, 1)),
         sg.FileBrowse(target='-DATASET-'),
         sg.Button('Load')

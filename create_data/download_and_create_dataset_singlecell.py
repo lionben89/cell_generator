@@ -9,7 +9,7 @@ import shutil
 import cv2
 from collections import OrderedDict
 import global_vars as gv
-"""This script will download the single cell data from the Allen Inst. S3 and will stack all the relevant channels for that cell"""
+"""This script will download the FOVs data from the Allen Inst. S3 and will stack all the relevant channels for that cell"""
 ## global vars
 #number of threads to run
 num_threads=6

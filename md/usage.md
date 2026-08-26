@@ -1,5 +1,7 @@
 # Usage
 
+In this section we show how to train Mask Interpreter on your own models.
+
 ## Model Types and Differences
 
 MaskInterpreter supports three types of predictive models:
@@ -17,6 +19,10 @@ MaskInterpreter supports three types of predictive models:
 
 All variants share the same core principle: minimize the mask while maintaining high correlation between predictions on original vs. adapted (masked + noise) inputs.
 
+## Before Training:
+We need to asses the amount of noise your model and input can tolarate. (see Methods section in the [paper](https://www.biorxiv.org/content/10.64898/2026.08.13.744455v1))
+and example code for the in silico labeling use in [figures/1_choose_noise_scale.py](../figures/1_choose_noise_scale.py)
+
 ## Training: Image-to-Image Models
 
 For image-to-image models (e.g., organelle prediction, segmentation):
@@ -27,7 +33,7 @@ from models.UNETO import get_unet
 import tensorflow as tf
 
 # Load your pre-trained predictor
-predictor = tf.keras.models.load_model('your_model.h5')
+predictor = tf.keras.models.load_model('your_model') #path/to/models_and_data/models/unet_model_22_05_22_ne_128
 predictor.trainable = False
 
 # Create the mask generator (U-Net based)
@@ -46,7 +52,7 @@ mask_interpreter.compile(
     g_optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
     similarity_loss_weight=1.0,
     mask_loss_weight=1.0,
-    noise_scale=1.5, ## Noise that remove most of the signal. check figures/1_choose_noise_scale.py
+    noise_scale=1.5, ## Noise that remove most of the signal. check 'Before Training' section in this md file
     target_loss_weight=6
 )
 
@@ -61,7 +67,7 @@ mask_interpreter.fit(
 
 ## Training: Regression Models
 
-For regression models that predict continuous values (e.g., cell cycle markers, protein concentrations):
+For regression models that predict continuous values (e.g., cell cycle markers):
 
 ```python
 from models.MaskInterpreterRegression import MaskInterpreterRegression
@@ -69,7 +75,7 @@ from models.UNETO import get_unet
 import tensorflow as tf
 
 # Load your pre-trained regressor
-regressor = tf.keras.models.load_model('cellcycle_marker1.h5')
+regressor = tf.keras.models.load_model('regression.h5')
 regressor.trainable = False
 
 # Create the mask generator
@@ -120,7 +126,7 @@ from models.UNETO import get_unet
 import tensorflow as tf
 
 # Load your pre-trained classifier
-classifier = tf.keras.models.load_model('cifar10_classifier.h5')
+classifier = tf.keras.models.load_model('classifier.h5')
 classifier.trainable = False
 
 # Create the mask generator

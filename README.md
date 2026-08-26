@@ -14,12 +14,13 @@ Lion Ben Nedava<sup>1*</sup>, Gad Miller<sup>1*</sup>, Nitsan Elmalam<sup>1</sup
 Cross-modality image translation promises to provide multiple layers of biological information from a single input, yet its practical application is stalled by a lack of interpretability and the inability to account for model imperfections. In silico labeling, the inference of organelle localization from label-free images, is a primary example where this black-box nature limits adoption. We present Mask Interpreter, a generalized method for semantic visual interpretability of image-to-image translation models. By uncovering organelle-specific "explanation signatures", we demonstrate that models leverage unique and reproducible biological patterns. Mask Interpreter outperforms traditional xAI approaches, identifies batch effects and localized prediction errors when ground-truth fluorescence is unavailable. Our supervised confidence modeling provides fine-grained reliability assessment at single-cell resolution, enabling the automated exclusion of artifacts from downstream analyses. By bridging the gap between computational inference and meaningful biological features, Mask Interpreter transforms in silico labeling into a rigorous, evidence-based instrument for scientific discovery across diverse biomedical imaging modalities.
 
 <p align="center">
-  <img src="figures/figure1.png" alt="MaskInterpreter Architecture" height="600"/>
+  <img src="figures/Figure1.png" alt="MaskInterpreter Architecture" height="600"/>
 </p>
 
 **Figure 1. Interpreting in silico labeling using Mask Interpreter**. (A) Training of in silico labeling models using matched label-free and fluorescence images. (B) Example of predictions with/without using MaskInterpreter’s importance mask. (C-F) Training and inference pipeline schematic. 
 
-See Paper (link) for details.
+See Paper (link) for details:
+[https://doi.org/10.64898/2026.08.13.744455](https://doi.org/10.64898/2026.08.13.744455)
 
 ## 2. Overview
 Deep learning models often operate as "black boxes," making it difficult to understand which input features drive their predictions. MaskInterpreter addresses this by learning a per-organelle mask generator network that identifies important regions through a novel training objective:
@@ -96,13 +97,13 @@ mask_interpreter/
 
 ### Download Trained Models and Example Data
 
-Pre-trained models and example data are available from Zenodo for quick start and reproducibility.
+Pre-trained models and example data are available from Zenodo for [quick start](md/quickstart.md) and reproducibility.
 
 #### Download from Zenodo
 
 Visit the Zenodo repository to download the required files:
 
-**Zenodo Link:** [https://zenodo.org/records/18590674](https://zenodo.org/records/18590674)
+**Zenodo Link:** [https://zenodo.org/records/22107794](https://zenodo.org/records/22107794)
 
 The archive contains:
 - **Pre-trained in silico labeling models** - Trained on various organelles
@@ -174,7 +175,7 @@ print('MaskInterpreter imported successfully!')
 
 ### Configuration
 
-The project uses `global_vars.py` for configuration including paths for data, models, and the repository. You can configure these either by:
+The project uses `global_vars.py` for configuration including paths for data, models, and the repository. 
 
 Open [global_vars.py](global_vars.py) and update the path variables at the top of the file:
 
@@ -201,20 +202,25 @@ CWD = 'current working dir'
 ## 9. [Recreate Figures from Paper](md/reproduce.md)
 
 ## PyTorch Implementation
-> **PyTorch Implementation and implementation of supervised confidence model**: For a PyTorch version of MaskInterpreter and tools for assessing the supervised prediction quality at inference time using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/MaskInterpreter-Applications](https://github.com/zaritskylab/MaskInterpreter-Applications)
+> **PyTorch Implementation and supervised confidence model implementation**: For a PyTorch version of MaskInterpreter and tools for assessing the supervised prediction quality at inference time using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/Interpretability](https://github.com/zaritskylab/Interpretability)
 
 ## Citation
 
 If you use MaskInterpreter in your research, please cite:
-
 ```bibtex
-@article{TODO,
-  title={TODO},
-  author={Ben Nedava, Lion and Miller, Gad and Zaritsky, Assaf},
-  journal={bioRxiv},
-  year={2026}
+@article {Ben Nedava2026.08.13.744455,
+	author = {Ben Nedava, Lion and Miller, Gad and Elmalam, Nitsan and Viana, Matheus P. and Chen, Jianxu and Gaudreault, Nathalie and Rafelski, Susanne M. and Zaritsky, Assaf},
+	title = {Trustworthy in silico labeling via semantic visual interpretability of image-to-image translation},
+	year = {2026},
+	doi = {10.64898/2026.08.13.744455},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2026/08/15/2026.08.13.744455},
+	eprint = {https://www.biorxiv.org/content/early/2026/08/15/2026.08.13.744455.full.pdf},
+	journal = {bioRxiv}
 }
+
 ```
+link:[https://doi.org/10.64898/2026.08.13.744455](https://doi.org/10.64898/2026.08.13.744455)
 
 ## Acknowledgments
 
@@ -224,3 +230,7 @@ If you use MaskInterpreter in your research, please cite:
 
 - **Email**: assafzar@gmail.com , lionben89@gmail.com, gadmicha@post.bgu.ac.il
 - **Lab**: [Zaritsky Lab](https://www.https://www.assafzaritsky.com/)
+
+## License
+
+This repository (data, documentation, and figures) is intended for academic and research use, and is licensed under CC BY-NC 4.0. See [LICENSE](md/LICENSE) for details.

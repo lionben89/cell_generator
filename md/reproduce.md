@@ -2,10 +2,7 @@
 
 To reproduce all figures from the paper, run the scripts in the `figures/` folder in numerical order. 
 
-**Important**: Before running, update the following paths in each script:
-- Model checkpoint paths (trained MaskInterpreter and predictor models)
-- Data directory paths (Allen Cell Collection dataset location)
-- Output directory paths for generated figures
+**Important**: Before running, update the neccessary parameters at the begining of each script.
 
 ## Running Scripts in Order
 

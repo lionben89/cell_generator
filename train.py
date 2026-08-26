@@ -24,27 +24,27 @@ gv.input = "channel_signal"
 gv.target = "channel_dna"
 
 #Organelle to train the model upon
-gv.organelle = "Nucleolus-(Granular-Component)" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+organelle = "Nucleolus-(Granular-Component)" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.train_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_train.csv".format(gv.organelle))
-gv.test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(gv.organelle))
+train_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_train.csv".format(organelle))
+test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
+    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(organelle,compound,drug))
 else:
-    ds_path = gv.train_ds_path
+    ds_path = train_ds_path
     
 gv.batch_size = 4
 norm_type = "std"
 gv.patch_size = (32,128,128,1)
 
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
-print(gv.organelle)
+print(organelle)
 #example to add predictors to the dataset predictors={"Nuclear-envelope":ne_unet,"Nucleolus-(Granular-Component)":ngc_unet}
 train_dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, predictors=None,delete_cahce=True)
 validation_dataset = DataGen(ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 16, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type, predictors=None)
@@ -82,8 +82,8 @@ elif (gv.model_type == "MG"):
     if weighted_pcc:
         dilate = weighted_pcc #False for regular pearson, True for modified
         gv.target = "structure_seg"
-        train_dataset = DataGen(gv.train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, dilate=dilate) 
-        validation_dataset = DataGen(gv.train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type, dilate=dilate)
+        train_dataset = DataGen(train_ds_path ,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 32, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=0.8,augment=True,norm_type=norm_type, dilate=dilate) 
+        validation_dataset = DataGen(train_ds_path,gv.input,gv.target,batch_size = gv.batch_size, num_batches = 8, patch_size=gv.patch_size,min_precentage=0.8,max_precentage=1.0,augment=False,norm_type=norm_type, dilate=dilate)
     
     interpert_model = keras.models.load_model(gv.interpert_model_path)
     interpert_model.summary()
